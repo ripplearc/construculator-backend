@@ -1,11 +1,23 @@
-name: 'database-tests'
+name: 'Database Integration Tests'
 on:
   pull_request:
+    branches: [ main ]
+    paths:
+      - 'supabase/**/*.sql'
 
 jobs:
-  build:
+  database-tests:
+    name: Database Tests
     runs-on: ubuntu-latest
     steps:
+      - name: Block CI skip attempts
+        run: |
+          if [[ "${{ github.event.head_commit.message }}" =~ \[skip\ ci\] ]] || 
+             [[ "${{ github.event.head_commit.message }}" =~ \[ci\ skip\] ]]; then
+            echo "::error::Commit contains '[skip ci]' or '[ci skip]' - failing build!"
+            exit 1
+          fi
+
       - uses: actions/checkout@v3
       - uses: supabase/setup-cli@v1
         with:
