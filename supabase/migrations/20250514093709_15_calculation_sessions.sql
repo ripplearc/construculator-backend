@@ -7,3 +7,8 @@ CREATE TABLE "calculation_sessions" (
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "last_calculation_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "calculation_sessions" ("project_id");
+CREATE INDEX ON "calculation_sessions" ("creator_user_id");
+CREATE INDEX ON "calculation_sessions" ("last_calculation_at");
+CREATE INDEX ON "calculation_sessions" ("created_at");

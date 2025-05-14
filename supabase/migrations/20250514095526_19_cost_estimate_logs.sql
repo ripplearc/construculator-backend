@@ -8,3 +8,8 @@ CREATE TABLE "cost_estimate_logs" (
   "details" jsonb NOT NULL,
   "logged_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "cost_estimate_logs" ("estimate_id");
+CREATE INDEX ON "cost_estimate_logs" ("activity");
+CREATE INDEX ON "cost_estimate_logs" ("user_id");
+CREATE INDEX ON "cost_estimate_logs" ("logged_at");

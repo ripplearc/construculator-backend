@@ -13,3 +13,6 @@ CREATE TABLE "users" (
   "user_status" user_profile_status_enum NOT NULL DEFAULT 'active',
   "user_preferences" jsonb NOT NULL
 );
+
+CREATE INDEX ON "users" ("created_at");
+CREATE INDEX ON "users" ("user_status");

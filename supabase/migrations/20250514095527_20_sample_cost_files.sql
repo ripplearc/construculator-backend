@@ -10,3 +10,5 @@ CREATE TABLE "sample_cost_files" (
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "sample_cost_files" ("status");

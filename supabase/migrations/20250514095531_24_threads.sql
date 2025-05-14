@@ -9,3 +9,8 @@ CREATE TABLE "threads" (
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "threads" ("cost_item_id");
+CREATE INDEX ON "threads" ("creator_user_id");
+CREATE INDEX ON "threads" ("created_at");
+CREATE INDEX ON "threads" ("updated_at");

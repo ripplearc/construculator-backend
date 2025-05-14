@@ -5,3 +5,7 @@ CREATE TABLE "role_permissions" (
   "permission_id" uuid NOT NULL REFERENCES "permissions"("id"),
   "granted_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE UNIQUE INDEX "role_permission_uq" ON "role_permissions" ("role_id", "permission_id");
+CREATE INDEX ON "role_permissions" ("role_id");
+CREATE INDEX ON "role_permissions" ("permission_id");

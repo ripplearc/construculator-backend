@@ -5,3 +5,6 @@ CREATE TABLE "session_tags" (
   "tag_id" uuid NOT NULL REFERENCES "tags"("id"),
   "applied_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE UNIQUE INDEX "session_tag_uq" ON "session_tags" ("session_id", "tag_id");
+CREATE INDEX ON "session_tags" ("tag_id");

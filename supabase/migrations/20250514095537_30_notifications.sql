@@ -13,3 +13,8 @@ CREATE TABLE "notifications" (
   "status" general_status_enum NOT NULL DEFAULT 'active',
   "created_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "notifications" ("recipient_user_id");
+CREATE INDEX ON "notifications" ("notification_type");
+CREATE INDEX ON "notifications" ("notification_status");
+CREATE INDEX ON "notifications" ("created_at");

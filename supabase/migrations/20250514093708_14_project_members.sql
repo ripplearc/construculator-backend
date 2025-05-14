@@ -9,3 +9,10 @@ CREATE TABLE "project_members" (
   "joined_at" timestamptz,
   "membership_status" membership_status_enum NOT NULL DEFAULT 'invited'
 );
+
+CREATE UNIQUE INDEX "project_user_membership_uq" ON "project_members" ("project_id", "user_id");
+CREATE INDEX ON "project_members" ("user_id");
+CREATE INDEX ON "project_members" ("role_id");
+CREATE INDEX ON "project_members" ("invited_by_user_id");
+CREATE INDEX ON "project_members" ("membership_status");
+CREATE INDEX ON "project_members" ("joined_at");

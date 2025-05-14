@@ -21,3 +21,9 @@ CREATE TABLE "cost_estimates" (
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "cost_estimates" ("project_id");
+CREATE INDEX ON "cost_estimates" ("creator_user_id");
+CREATE INDEX ON "cost_estimates" ("is_locked");
+CREATE INDEX ON "cost_estimates" ("updated_at");
+CREATE INDEX ON "cost_estimates" ("created_at");

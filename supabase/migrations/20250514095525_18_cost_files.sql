@@ -12,3 +12,8 @@ CREATE TABLE "cost_files" (
   "is_sample_file" boolean NOT NULL DEFAULT false,
   "uploaded_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "cost_files" ("project_id");
+CREATE INDEX ON "cost_files" ("uploaded_by_user_id");
+CREATE INDEX ON "cost_files" ("version");
+CREATE INDEX "cost_files_active_idx" ON "cost_files" ("project_id", "is_active_file");

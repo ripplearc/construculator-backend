@@ -3,6 +3,7 @@ CREATE TABLE "attachments" (
   "id" uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
   "cost_estimate_id" uuid REFERENCES "cost_estimates"("id"),
   "calculation_id" uuid REFERENCES "calculations"("id"),
+  "project_id" uuid NOT NULL REFERENCES "projects"("id"),
   "uploaded_by_user_id" uuid NOT NULL REFERENCES "users"("id"),
   "document_category_id" uuid REFERENCES "document_categories"("id"),
   "attachment_parent_type" attachment_parent_type_enum NOT NULL,

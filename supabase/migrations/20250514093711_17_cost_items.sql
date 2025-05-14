@@ -19,7 +19,11 @@ CREATE TABLE "cost_items" (
   "labor_unit_type" varchar(50),
   "labor_unit_value" decimal(18,4),
   "crew_size" int,
-  "logs" jsonb,
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "cost_items" ("estimate_id");
+CREATE INDEX ON "cost_items" ("item_type");
+CREATE INDEX ON "cost_items" ("created_at");
+CREATE INDEX ON "cost_items" ("updated_at");

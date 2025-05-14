@@ -6,3 +6,5 @@ CREATE TABLE "permissions" (
   "context_type" context_type_enum NOT NULL DEFAULT 'project',
   "created_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "permissions" ("context_type");

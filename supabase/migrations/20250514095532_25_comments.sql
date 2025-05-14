@@ -9,3 +9,9 @@ CREATE TABLE "comments" (
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "comments" ("thread_id");
+CREATE INDEX ON "comments" ("author_user_id");
+CREATE INDEX ON "comments" ("created_at");
+CREATE INDEX ON "comments" ("updated_at");
+CREATE INDEX ON "comments" ("parent_comment_id");

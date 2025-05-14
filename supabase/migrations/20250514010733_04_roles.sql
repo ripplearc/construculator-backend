@@ -8,3 +8,5 @@ CREATE TABLE "roles" (
   "created_at" timestamptz NOT NULL DEFAULT (now()),
   "updated_at" timestamptz NOT NULL DEFAULT (now())
 );
+
+CREATE INDEX ON "roles" ("context_type");
