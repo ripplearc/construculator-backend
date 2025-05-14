@@ -1,0 +1,2 @@
+/.github/CODEOWNERS @ripplearc/construculator-devop
+/.github/workflows/database_tests.yml @ripplearc/construculator-devop

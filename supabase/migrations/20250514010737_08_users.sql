@@ -14,5 +14,6 @@ CREATE TABLE "users" (
   "user_preferences" jsonb NOT NULL
 );
 
+CREATE INDEX ON "users" ("professional_role");
 CREATE INDEX ON "users" ("created_at");
 CREATE INDEX ON "users" ("user_status");
