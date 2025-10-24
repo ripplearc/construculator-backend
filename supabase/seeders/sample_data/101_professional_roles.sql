@@ -1,7 +1,6 @@
 -- Professional Roles Seeder
 -- This file creates the foundational professional roles needed for the system
 
--- Insert professional roles
 INSERT INTO "professional_roles" ("id", "name") VALUES
   ('550e8400-e29b-41d4-a716-446655440001', 'Project Manager'),
   ('550e8400-e29b-41d4-a716-446655440002', 'Cost Estimator'),
