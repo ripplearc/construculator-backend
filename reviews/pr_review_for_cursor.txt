@@ -1,0 +1,1296 @@
+# PR Review Request: 10-22-feat_add_rls_policies_essential_seeders_and_updated_config.toml → master
+PR Branch: 10-22-feat_add_rls_policies_essential_seeders_and_updated_config.toml (with changes)
+Base Branch: master (target)
+Date: Fri Oct 24 15:21:48 EAT 2025
+
+## CHANGES OVERVIEW
+
+| File | Changes | Type |
+|------|---------|------|
+| package-lock.json | Added | Binary |
+| supabase/config.toml | Modified:  1 file changed, 1 insertion(+), 1 deletion(-) | Text |
+| supabase/migrations/20251022010112_RLS_01_roles_and_permissions_rules.sql | Added:  1 file changed, 15 insertions(+) | Text |
+| supabase/migrations/20251022010113_RLS_02_project_members_rules.sql | Added:  1 file changed, 7 insertions(+) | Text |
+| supabase/migrations/20251022010114_RLS_03_cost_estimation_rules.sql | Added:  1 file changed, 58 insertions(+) | Text |
+| supabase/migrations/20251024018215_RLS_04_performance_optimizations.sql | Added:  1 file changed, 24 insertions(+) | Text |
+| supabase/seeders/constants/001_permissions.sql | Added:  1 file changed, 8 insertions(+) | Text |
+| supabase/seeders/sample_data/101_professional_roles.sql | Added:  1 file changed, 11 insertions(+) | Text |
+| supabase/seeders/sample_data/102_companies.sql | Added:  1 file changed, 9 insertions(+) | Text |
+| supabase/seeders/sample_data/103_users.sql | Added:  1 file changed, 8 insertions(+) | Text |
+| supabase/seeders/sample_data/104_projects.sql | Added:  1 file changed, 10 insertions(+) | Text |
+| supabase/seeders/sample_data/105_cost_estimates.sql | Added:  1 file changed, 141 insertions(+) | Text |
+| supabase/seeders/sample_data/106_roles_and_role_permissions.sql | Added:  1 file changed, 34 insertions(+) | Text |
+| yarn.lock | Modified:  1 file changed, 35 insertions(+), 41 deletions(-) | Text |
+
+## GITHUB-STYLE DIFF WITH CONTEXT
+
+### package-lock.json (Added)
+
+```json
+diff --git package-lock.json package-lock.json
+new file mode 100644
+index 0000000..e454a74
+--- /dev/null
++++ package-lock.json
+@@ -0,0 +1,345 @@
++{
++  "name": "construculator-backend",
++  "lockfileVersion": 3,
++  "requires": true,
++  "packages": {
++    "": {
++      "devDependencies": {
++        "supabase": "^2.22.12"
++      }
++    },
++    "node_modules/@isaacs/fs-minipass": {
++      "version": "4.0.1",
++      "resolved": "https://registry.npmjs.org/@isaacs/fs-minipass/-/fs-minipass-4.0.1.tgz",
++      "integrity": "sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==",
++      "dev": true,
++      "license": "ISC",
++      "dependencies": {
++        "minipass": "^7.0.4"
++      },
++      "engines": {
++        "node": ">=18.0.0"
++      }
++    },
++    "node_modules/agent-base": {
++      "version": "7.1.3",
++      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.3.tgz",
++      "integrity": "sha512-jRR5wdylq8CkOe6hei19GGZnxM6rBGwFl3Bg0YItGDimvjGtAvdZk4Pu6Cl4u4Igsws4a1fd1Vq3ezrhn4KmFw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">= 14"
++      }
++    },
++    "node_modules/bin-links": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/bin-links/-/bin-links-5.0.0.tgz",
++      "integrity": "sha512-sdleLVfCjBtgO5cNjA2HVRvWBJAHs4zwenaCPMNJAJU0yNxpzj80IpjOIimkpkr+mhlA+how5poQtt53PygbHA==",
++      "dev": true,
++      "license": "ISC",
++      "dependencies": {
++        "cmd-shim": "^7.0.0",
++        "npm-normalize-package-bin": "^4.0.0",
++        "proc-log": "^5.0.0",
++        "read-cmd-shim": "^5.0.0",
++        "write-file-atomic": "^6.0.0"
++      },
++      "engines": {
++        "node": "^18.17.0 || >=20.5.0"
++      }
++    },
++    "node_modules/chownr": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/chownr/-/chownr-3.0.0.tgz",
++      "integrity": "sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/cmd-shim": {
++      "version": "7.0.0",
++      "resolved": "https://registry.npmjs.org/cmd-shim/-/cmd-shim-7.0.0.tgz",
++      "integrity": "sha512-rtpaCbr164TPPh+zFdkWpCyZuKkjpAzODfaZCf/SVJZzJN+4bHQb/LP3Jzq5/+84um3XXY8r548XiWKSborwVw==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": "^18.17.0 || >=20.5.0"
++      }
++    },
++    "node_modules/data-uri-to-buffer": {
++      "version": "4.0.1",
++      "resolved": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
++      "integrity": "sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">= 12"
++      }
++    },
++    "node_modules/debug": {
++      "version": "4.4.0",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.0.tgz",
++      "integrity": "sha512-6WTZ/IxCY/T6BALoZHaE4ctp9xm+Z5kY/pzYaCHRFeyVhojxlrm+46y68HA6hr0TcwEssoxNiDEUJQjfPZ/RYA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "ms": "^2.1.3"
++      },
++      "engines": {
++        "node": ">=6.0"
++      },
++      "peerDependenciesMeta": {
++        "supports-color": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/fetch-blob": {
++      "version": "3.2.0",
++      "resolved": "https://registry.npmjs.org/fetch-blob/-/fetch-blob-3.2.0.tgz",
++      "integrity": "sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==",
++      "dev": true,
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/jimmywarting"
++        },
++        {
++          "type": "paypal",
++          "url": "https://paypal.me/jimmywarting"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "node-domexception": "^1.0.0",
++        "web-streams-polyfill": "^3.0.3"
++      },
++      "engines": {
++        "node": "^12.20 || >= 14.13"
++      }
++    },
++    "node_modules/formdata-polyfill": {
++      "version": "4.0.10",
++      "resolved": "https://registry.npmjs.org/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz",
++      "integrity": "sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "fetch-blob": "^3.1.2"
++      },
++      "engines": {
++        "node": ">=12.20.0"
++      }
++    },
++    "node_modules/https-proxy-agent": {
++      "version": "7.0.6",
++      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz",
++      "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "agent-base": "^7.1.2",
++        "debug": "4"
++      },
++      "engines": {
++        "node": ">= 14"
++      }
++    },
++    "node_modules/imurmurhash": {
++      "version": "0.1.4",
++      "resolved": "https://registry.npmjs.org/imurmurhash/-/imurmurhash-0.1.4.tgz",
++      "integrity": "sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">=0.8.19"
++      }
++    },
++    "node_modules/minipass": {
++      "version": "7.1.2",
++      "resolved": "https://registry.npmjs.org/minipass/-/minipass-7.1.2.tgz",
++      "integrity": "sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": ">=16 || 14 >=14.17"
++      }
++    },
++    "node_modules/minizlib": {
++      "version": "3.1.0",
++      "resolved": "https://registry.npmjs.org/minizlib/-/minizlib-3.1.0.tgz",
++      "integrity": "sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "minipass": "^7.1.2"
++      },
++      "engines": {
++        "node": ">= 18"
++      }
++    },
++    "node_modules/ms": {
++      "version": "2.1.3",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
++      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
++      "dev": true,
++      "license": "MIT"
++    },
++    "node_modules/node-domexception": {
++      "version": "1.0.0",
++      "resolved": "https://registry.npmjs.org/node-domexception/-/node-domexception-1.0.0.tgz",
++      "integrity": "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==",
++      "deprecated": "Use your platform's native DOMException instead",
++      "dev": true,
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/jimmywarting"
++        },
++        {
++          "type": "github",
++          "url": "https://paypal.me/jimmywarting"
++        }
++      ],
++      "license": "MIT",
++      "engines": {
++        "node": ">=10.5.0"
++      }
++    },
++    "node_modules/node-fetch": {
++      "version": "3.3.2",
++      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-3.3.2.tgz",
++      "integrity": "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==",
++      "dev": true,
++      "license": "MIT",
++      "dependencies": {
++        "data-uri-to-buffer": "^4.0.0",
++        "fetch-blob": "^3.1.4",
++        "formdata-polyfill": "^4.0.10"
++      },
++      "engines": {
++        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/node-fetch"
++      }
++    },
++    "node_modules/npm-normalize-package-bin": {
++      "version": "4.0.0",
++      "resolved": "https://registry.npmjs.org/npm-normalize-package-bin/-/npm-normalize-package-bin-4.0.0.tgz",
++      "integrity": "sha512-TZKxPvItzai9kN9H/TkmCtx/ZN/hvr3vUycjlfmH0ootY9yFBzNOpiXAdIn1Iteqsvk4lQn6B5PTrt+n6h8k/w==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": "^18.17.0 || >=20.5.0"
++      }
++    },
++    "node_modules/proc-log": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/proc-log/-/proc-log-5.0.0.tgz",
++      "integrity": "sha512-Azwzvl90HaF0aCz1JrDdXQykFakSSNPaPoiZ9fm5qJIMHioDZEi7OAdRwSm6rSoPtY3Qutnm3L7ogmg3dc+wbQ==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": "^18.17.0 || >=20.5.0"
++      }
++    },
++    "node_modules/read-cmd-shim": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/read-cmd-shim/-/read-cmd-shim-5.0.0.tgz",
++      "integrity": "sha512-SEbJV7tohp3DAAILbEMPXavBjAnMN0tVnh4+9G8ihV4Pq3HYF9h8QNez9zkJ1ILkv9G2BjdzwctznGZXgu/HGw==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": "^18.17.0 || >=20.5.0"
++      }
++    },
++    "node_modules/signal-exit": {
++      "version": "4.1.0",
++      "resolved": "https://registry.npmjs.org/signal-exit/-/signal-exit-4.1.0.tgz",
++      "integrity": "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==",
++      "dev": true,
++      "license": "ISC",
++      "engines": {
++        "node": ">=14"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/isaacs"
++      }
++    },
++    "node_modules/supabase": {
++      "version": "2.48.3",
++      "resolved": "https://registry.npmjs.org/supabase/-/supabase-2.48.3.tgz",
++      "integrity": "sha512-92vjrWqRUQPX9eYgTYlSSVXfpjzsAa++IX7IEM99BoYvNS3Pl6VrsqGN06QWi4VaX7FlPjjHLp+aIjoeWXcBug==",
++      "dev": true,
++      "hasInstallScript": true,
++      "license": "MIT",
++      "dependencies": {
++        "bin-links": "^5.0.0",
++        "https-proxy-agent": "^7.0.2",
++        "node-fetch": "^3.3.2",
++        "tar": "7.5.1"
++      },
++      "bin": {
++        "supabase": "bin/supabase"
++      },
++      "engines": {
++        "npm": ">=8"
++      }
++    },
++    "node_modules/tar": {
++      "version": "7.5.1",
++      "resolved": "https://registry.npmjs.org/tar/-/tar-7.5.1.tgz",
++      "integrity": "sha512-nlGpxf+hv0v7GkWBK2V9spgactGOp0qvfWRxUMjqHyzrt3SgwE48DIv/FhqPHJYLHpgW1opq3nERbz5Anq7n1g==",
++      "dev": true,
++      "license": "ISC",
++      "dependencies": {
++        "@isaacs/fs-minipass": "^4.0.0",
++        "chownr": "^3.0.0",
++        "minipass": "^7.1.2",
++        "minizlib": "^3.1.0",
++        "yallist": "^5.0.0"
++      },
++      "engines": {
++        "node": ">=18"
++      }
++    },
++    "node_modules/web-streams-polyfill": {
++      "version": "3.3.3",
++      "resolved": "https://registry.npmjs.org/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz",
++      "integrity": "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==",
++      "dev": true,
++      "license": "MIT",
++      "engines": {
++        "node": ">= 8"
++      }
++    },
++    "node_modules/write-file-atomic": {
++      "version": "6.0.0",
++      "resolved": "https://registry.npmjs.org/write-file-atomic/-/write-file-atomic-6.0.0.tgz",
++      "integrity": "sha512-GmqrO8WJ1NuzJ2DrziEI2o57jKAVIQNf8a18W3nCYU3H7PNWqCCVTeH6/NQE93CIllIgQS98rrmVkYgTX9fFJQ==",
++      "dev": true,
++      "license": "ISC",
++      "dependencies": {
++        "imurmurhash": "^0.1.4",
++        "signal-exit": "^4.0.1"
++      },
++      "engines": {
++        "node": "^18.17.0 || >=20.5.0"
++      }
++    },
++    "node_modules/yallist": {
++      "version": "5.0.0",
++      "resolved": "https://registry.npmjs.org/yallist/-/yallist-5.0.0.tgz",
++      "integrity": "sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==",
++      "dev": true,
++      "license": "BlueOak-1.0.0",
++      "engines": {
++        "node": ">=18"
++      }
++    }
++  }
++}
+```
+
+#### Suggestions for package-lock.json
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```json
+// Suggested implementation
+```
+-->
+
+### supabase/config.toml (Modified)
+
+```toml
+diff --git supabase/config.toml supabase/config.toml
+index f8f07b5..7612e7d 100644
+--- supabase/config.toml
++++ supabase/config.toml
+@@ -55,7 +55,7 @@ schema_paths = []
+ enabled = true
+ # Specifies an ordered list of seed files to load during db reset.
+ # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
+-sql_paths = ["./seed.sql"]
++sql_paths = ["./seeders/**/*.sql"]
+ 
+ [realtime]
+ enabled = true
+```
+
+#### Suggestions for supabase/config.toml
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```toml
+// Suggested implementation
+```
+-->
+
+### supabase/migrations/20251022010112_RLS_01_roles_and_permissions_rules.sql (Added)
+
+```sql
+diff --git supabase/migrations/20251022010112_RLS_01_roles_and_permissions_rules.sql supabase/migrations/20251022010112_RLS_01_roles_and_permissions_rules.sql
+new file mode 100644
+index 0000000..c1e76cd
+--- /dev/null
++++ supabase/migrations/20251022010112_RLS_01_roles_and_permissions_rules.sql
+@@ -0,0 +1,15 @@
++-- RLS Policies for roles and permissions tables
++
++-- Policy for SELECT operations on permissions table
++-- Users can view permissions if they are authenticated
++-- This allows users to see what permissions are available in the system
++CREATE POLICY "permissions_select_policy" ON "permissions"
++  FOR SELECT
++  USING (auth.uid() IS NOT NULL);
++
++-- Policy for SELECT operations on role_permissions table
++-- Users can view role permissions if they are authenticated
++-- This allows users to see what permissions are assigned to different roles
++CREATE POLICY "role_permissions_select_policy" ON "role_permissions"
++  FOR SELECT
++  USING (auth.uid() IS NOT NULL);
+```
+
+#### Suggestions for supabase/migrations/20251022010112_RLS_01_roles_and_permissions_rules.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/migrations/20251022010113_RLS_02_project_members_rules.sql (Added)
+
+```sql
+diff --git supabase/migrations/20251022010113_RLS_02_project_members_rules.sql supabase/migrations/20251022010113_RLS_02_project_members_rules.sql
+new file mode 100644
+index 0000000..e7e634c
+--- /dev/null
++++ supabase/migrations/20251022010113_RLS_02_project_members_rules.sql
+@@ -0,0 +1,7 @@
++-- RLS Policies for project_members table
++
++-- Policy for SELECT operations on project_members table
++-- Users can view project memberships if they are authenticated
++CREATE POLICY "project_members_select_policy" ON "project_members"
++  FOR SELECT
++  USING (auth.uid() IS NOT NULL);
+\ No newline at end of file
+```
+
+#### Suggestions for supabase/migrations/20251022010113_RLS_02_project_members_rules.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/migrations/20251022010114_RLS_03_cost_estimation_rules.sql (Added)
+
+```sql
+diff --git supabase/migrations/20251022010114_RLS_03_cost_estimation_rules.sql supabase/migrations/20251022010114_RLS_03_cost_estimation_rules.sql
+new file mode 100644
+index 0000000..d15ffae
+--- /dev/null
++++ supabase/migrations/20251022010114_RLS_03_cost_estimation_rules.sql
+@@ -0,0 +1,58 @@
++-- RLS Policies for cost_estimates table
++-- These policies ensure users can only access cost estimates for projects they have appropriate permissions for
++
++-- Optimized permission checking function
++CREATE OR REPLACE FUNCTION "user_has_project_permission"(
++  p_project_id uuid,
++  p_permission_key text,
++  p_user_credential_id uuid
++) RETURNS boolean AS $$
++BEGIN
++  IF p_user_credential_id IS NULL THEN
++    RETURN false;
++  END IF;
++  
++  RETURN EXISTS (
++    SELECT 1
++    FROM "project_members" pm
++    JOIN "users" u ON pm.user_id = u.id
++    JOIN "role_permissions" rp ON pm.role_id = rp.role_id
++    JOIN "permissions" p ON rp.permission_id = p.id
++    WHERE pm.project_id = p_project_id
++      AND u.credential_id = p_user_credential_id
++      AND pm.membership_status = 'joined'
++      AND p.permission_key = p_permission_key
++  );
++END;
++$$ LANGUAGE plpgsql STABLE;
++
++-- Policy for SELECT operations (viewing cost estimates)
++-- Users can view cost estimates if they have the 'get_cost_estimations' permission for the project
++CREATE POLICY "cost_estimates_select_policy" ON "cost_estimates"
++  FOR SELECT
++  USING (
++    "user_has_project_permission"(
++      project_id,
++      'get_cost_estimations',
++      auth.uid()
++    )
++  );
++
++-- Policy for INSERT operations (creating cost estimates)
++-- Users can create cost estimates if they have the 'add_cost_estimation' permission for the project
++CREATE POLICY "cost_estimates_insert_policy" ON "cost_estimates"
++  FOR INSERT
++  WITH CHECK (
++    "user_has_project_permission"(
++      project_id,
++      'add_cost_estimation',
++      auth.uid()
++    )
++    AND EXISTS (
++      SELECT 1
++      FROM "users" u
++      WHERE u.id = cost_estimates.creator_user_id
++        AND u.credential_id = auth.uid()
++    )
++  );
++
+```
+
+#### Suggestions for supabase/migrations/20251022010114_RLS_03_cost_estimation_rules.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/migrations/20251024018215_RLS_04_performance_optimizations.sql (Added)
+
+```sql
+diff --git supabase/migrations/20251024018215_RLS_04_performance_optimizations.sql supabase/migrations/20251024018215_RLS_04_performance_optimizations.sql
+new file mode 100644
+index 0000000..5ef7fcf
+--- /dev/null
++++ supabase/migrations/20251024018215_RLS_04_performance_optimizations.sql
+@@ -0,0 +1,24 @@
++-- RLS Performance Optimizations
++
++-- Critical indexes for RLS policy performance
++CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_project_members_performance" 
++ON "project_members" ("project_id", "user_id", "membership_status", "role_id");
++
++CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_permissions_key" 
++ON "permissions" ("permission_key");
++
++CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_role_permissions_covering" 
++ON "role_permissions" ("role_id", "permission_id") 
++INCLUDE ("id");
++
++CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_users_credential_id" 
++ON "users" ("credential_id");
++
++CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_cost_estimates_creator" 
++ON "cost_estimates" ("creator_user_id");
++
++CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_users_id_credential" 
++ON "users" ("id", "credential_id");
++
++-- Update table statistics
++ANALYZE "project_members", "users", "role_permissions", "permissions", "cost_estimates";
+```
+
+#### Suggestions for supabase/migrations/20251024018215_RLS_04_performance_optimizations.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/constants/001_permissions.sql (Added)
+
+```sql
+diff --git supabase/seeders/constants/001_permissions.sql supabase/seeders/constants/001_permissions.sql
+new file mode 100644
+index 0000000..53232a9
+--- /dev/null
++++ supabase/seeders/constants/001_permissions.sql
+@@ -0,0 +1,8 @@
++-- Permissions define atomic operations that can be performed on a resource.
++-- Details can be found in the database design documentation: https://docs.google.com/document/d/144-j6mZluSGtFXZdF23cVf9hbVWt4vb-wA3eq02Au4M/edit?tab=t.86935laa5ftt#heading=h.kz665gmft5kd
++
++-- Insert permissions for cost estimation operations
++INSERT INTO "permissions" ("permission_key", "description", "context_type") VALUES
++  ('get_cost_estimations', 'Permission to retrieve and view cost estimations', 'project'),
++  ('add_cost_estimation', 'Permission to create and add new cost estimations', 'project')
++ON CONFLICT ("permission_key") DO NOTHING;
+```
+
+#### Suggestions for supabase/seeders/constants/001_permissions.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/sample_data/101_professional_roles.sql (Added)
+
+```sql
+diff --git supabase/seeders/sample_data/101_professional_roles.sql supabase/seeders/sample_data/101_professional_roles.sql
+new file mode 100644
+index 0000000..92a14b5
+--- /dev/null
++++ supabase/seeders/sample_data/101_professional_roles.sql
+@@ -0,0 +1,11 @@
++-- Professional Roles Seeder
++-- This file creates the foundational professional roles needed for the system
++
++-- Insert professional roles
++INSERT INTO "professional_roles" ("id", "name") VALUES
++  ('550e8400-e29b-41d4-a716-446655440001', 'Project Manager'),
++  ('550e8400-e29b-41d4-a716-446655440002', 'Cost Estimator'),
++  ('550e8400-e29b-41d4-a716-446655440003', 'Construction Manager'),
++  ('550e8400-e29b-41d4-a716-446655440004', 'Architect'),
++  ('550e8400-e29b-41d4-a716-446655440005', 'Engineer')
++ON CONFLICT ("id") DO NOTHING;
+```
+
+#### Suggestions for supabase/seeders/sample_data/101_professional_roles.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/sample_data/102_companies.sql (Added)
+
+```sql
+diff --git supabase/seeders/sample_data/102_companies.sql supabase/seeders/sample_data/102_companies.sql
+new file mode 100644
+index 0000000..be29782
+--- /dev/null
++++ supabase/seeders/sample_data/102_companies.sql
+@@ -0,0 +1,9 @@
++-- Companies Seeder
++-- This file creates sample companies for testing and development
++
++-- Insert companies
++INSERT INTO "companies" ("id", "email", "phone", "name", "logo_url") VALUES
++  ('650e8400-e29b-41d4-a716-446655440001', 'contact@buildcorp.com', '+1-555-0101', 'BuildCorp Construction', 'https://placehold.co/400'),
++  ('650e8400-e29b-41d4-a716-446655440002', 'info@megac.com', '+1-555-0102', 'Mega Construction Ltd', 'https://placehold.co/400'),
++  ('650e8400-e29b-41d4-a716-446655440003', 'hello@premb.com', '+1-555-0103', 'Premium Builders Inc', 'https://placehold.co/400')
++ON CONFLICT ("id") DO NOTHING;
+```
+
+#### Suggestions for supabase/seeders/sample_data/102_companies.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/sample_data/103_users.sql (Added)
+
+```sql
+diff --git supabase/seeders/sample_data/103_users.sql supabase/seeders/sample_data/103_users.sql
+new file mode 100644
+index 0000000..35cbfab
+--- /dev/null
++++ supabase/seeders/sample_data/103_users.sql
+@@ -0,0 +1,8 @@
++-- Users Seeder
++-- This file creates a single user for seeder reference purposes
++-- NOTE: This is for seeder data only - actual users should be created via Supabase API
++
++-- Insert a single user for seeder reference purposes
++INSERT INTO "users" ("id", "credential_id", "email", "phone", "first_name", "last_name", "professional_role", "user_preferences") VALUES
++  ('750e8400-e29b-41d4-a716-446655440000', '850e8400-e29b-41d4-a716-446655440000', 'seeder@example.com', '+1-555-0000', 'Seeder', 'User', (SELECT "id" FROM "professional_roles" WHERE "name" = 'Project Manager'), '{"theme": "light", "notifications": true}')
++ON CONFLICT ("id") DO NOTHING;
+```
+
+#### Suggestions for supabase/seeders/sample_data/103_users.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/sample_data/104_projects.sql (Added)
+
+```sql
+diff --git supabase/seeders/sample_data/104_projects.sql supabase/seeders/sample_data/104_projects.sql
+new file mode 100644
+index 0000000..cacdd39
+--- /dev/null
++++ supabase/seeders/sample_data/104_projects.sql
+@@ -0,0 +1,10 @@
++-- Projects Seeder
++-- This file creates sample projects for testing and development
++
++-- Insert projects
++INSERT INTO "projects" ("id", "project_name", "description", "creator_user_id", "owning_company_id", "export_storage_provider") VALUES
++  ('950e8400-e29b-41d4-a716-446655440001', 'Downtown Office Complex', 'Construction of a 15-story office building in downtown area', (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'), (SELECT "id" FROM "companies" WHERE "name" = 'BuildCorp Construction'), 'google_drive'),
++  ('950e8400-e29b-41d4-a716-446655440002', 'Residential Housing Development', 'Construction of 50 single-family homes in suburban area', (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'), (SELECT "id" FROM "companies" WHERE "name" = 'BuildCorp Construction'), 'one_drive'),
++  ('950e8400-e29b-41d4-a716-446655440003', 'Shopping Mall Renovation', 'Complete renovation of existing shopping mall including new stores and food court', NULL, (SELECT "id" FROM "companies" WHERE "name" = 'Mega Construction Ltd'), 'dropbox'),
++  ('950e8400-e29b-41d4-a716-446655440004', 'Industrial Warehouse', 'Construction of a 100,000 sq ft industrial warehouse facility', (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'), (SELECT "id" FROM "companies" WHERE "name" = 'Premium Builders Inc'), 'google_drive')
++ON CONFLICT ("id") DO NOTHING;
+```
+
+#### Suggestions for supabase/seeders/sample_data/104_projects.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/sample_data/105_cost_estimates.sql (Added)
+
+```sql
+diff --git supabase/seeders/sample_data/105_cost_estimates.sql supabase/seeders/sample_data/105_cost_estimates.sql
+new file mode 100644
+index 0000000..d46b396
+--- /dev/null
++++ supabase/seeders/sample_data/105_cost_estimates.sql
+@@ -0,0 +1,141 @@
++-- Cost Estimates Seeder
++-- This file creates sample cost estimates with various markup configurations
++
++INSERT INTO "cost_estimates" (
++  "id",
++  "project_id",
++  "estimate_name",
++  "estimate_description",
++  "creator_user_id",
++  "markup_type",
++  "overall_markup_value_type",
++  "overall_markup_value",
++  "material_markup_value_type",
++  "material_markup_value",
++  "labor_markup_value_type",
++  "labor_markup_value",
++  "equipment_markup_value_type",
++  "equipment_markup_value",
++  "total_cost",
++  "is_locked"
++) VALUES
++  -- Downtown Office Complex - Overall markup estimate
++  (
++    'a50e8400-e29b-41d4-a716-446655440001',
++    (SELECT "id" FROM "projects" WHERE "project_name" = 'Downtown Office Complex'),
++    'Initial Construction Estimate',
++    'Preliminary cost estimate for the downtown office complex construction including all major components',
++    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
++    'overall',
++    'percentage',
++    15.00,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    2500000.00,
++    false
++  ),
++  
++  -- Downtown Office Complex - Granular markup estimate
++  (
++    'a50e8400-e29b-41d4-a716-446655440002',
++    (SELECT "id" FROM "projects" WHERE "project_name" = 'Downtown Office Complex'),
++    'Detailed Cost Breakdown',
++    'Detailed estimate with separate markup rates for materials, labor, and equipment',
++    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
++    'granular',
++    NULL,
++    NULL,
++    'percentage',
++    12.00,
++    'percentage',
++    18.00,
++    'percentage',
++    10.00,
++    2750000.00,
++    true
++  ),
++  
++  -- Residential Housing Development - Simple estimate
++  (
++    'a50e8400-e29b-41d4-a716-446655440003',
++    (SELECT "id" FROM "projects" WHERE "project_name" = 'Residential Housing Development'),
++    'Phase 1 Housing Units',
++    'Cost estimate for the first 25 housing units in the residential development',
++    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
++    'overall',
++    'amount',
++    50000.00,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    1200000.00,
++    false
++  ),
++  
++  -- Shopping Mall Renovation - Complex estimate
++  (
++    'a50e8400-e29b-41d4-a716-446655440004',
++    (SELECT "id" FROM "projects" WHERE "project_name" = 'Shopping Mall Renovation'),
++    'Complete Renovation Estimate',
++    'Comprehensive cost estimate for shopping mall renovation including structural changes and new installations',
++    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
++    'granular',
++    NULL,
++    NULL,
++    'percentage',
++    8.00,
++    'percentage',
++    22.00,
++    'amount',
++    15000.00,
++    1800000.00,
++    false
++  ),
++  
++  -- Industrial Warehouse - Basic estimate
++  (
++    'a50e8400-e29b-41d4-a716-446655440005',
++    (SELECT "id" FROM "projects" WHERE "project_name" = 'Industrial Warehouse'),
++    'Warehouse Construction Estimate',
++    'Cost estimate for industrial warehouse construction including foundation, structure, and utilities',
++    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
++    'overall',
++    'percentage',
++    20.00,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    NULL,
++    3200000.00,
++    true
++  ),
++  
++  -- Downtown Office Complex - Revised estimate
++  (
++    'a50e8400-e29b-41d4-a716-446655440006',
++    (SELECT "id" FROM "projects" WHERE "project_name" = 'Downtown Office Complex'),
++    'Revised Estimate v2.0',
++    'Updated cost estimate after design changes and material price adjustments',
++    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
++    'granular',
++    NULL,
++    NULL,
++    'percentage',
++    14.00,
++    'percentage',
++    16.00,
++    'percentage',
++    12.00,
++    2900000.00,
++    false
++  )
++ON CONFLICT ("id") DO NOTHING;
+\ No newline at end of file
+```
+
+#### Suggestions for supabase/seeders/sample_data/105_cost_estimates.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### supabase/seeders/sample_data/106_roles_and_role_permissions.sql (Added)
+
+```sql
+diff --git supabase/seeders/sample_data/106_roles_and_role_permissions.sql supabase/seeders/sample_data/106_roles_and_role_permissions.sql
+new file mode 100644
+index 0000000..82e690d
+--- /dev/null
++++ supabase/seeders/sample_data/106_roles_and_role_permissions.sql
+@@ -0,0 +1,34 @@
++-- Roles and Role Permissions Seeder
++-- This file creates roles, assigns permissions to roles, and assigns users to roles for testing
++-- Note: Permissions are defined in supabase/seeders/constants/permissions.sql
++
++-- Insert roles with different permission levels
++INSERT INTO "roles" ("id", "role_name", "level", "description", "context_type") VALUES
++  ('a50e8400-e29b-41d4-a716-446655440001', 'Admin', 4, 'Full control over project including all cost estimations and team management', 'project'),
++  ('a50e8400-e29b-41d4-a716-446655440002', 'Manager', 3, 'Can manage project, view and edit cost estimations, manage team members', 'project'),
++  ('a50e8400-e29b-41d4-a716-446655440003', 'Collaborator', 2, 'Can view and create cost estimations, limited team management', 'project'),
++  ('a50e8400-e29b-41d4-a716-446655440004', 'Viewer', 2, 'Read-only access to project and cost estimations', 'project')
++ON CONFLICT ("id") DO NOTHING;
++
++-- Assign permissions to Admin role (highest level)
++INSERT INTO "role_permissions" ("role_id", "permission_id") VALUES
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Admin'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'get_cost_estimations')),
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Admin'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'add_cost_estimation'))
++ON CONFLICT ("role_id", "permission_id") DO NOTHING;
++
++-- Assign permissions to Manager role
++INSERT INTO "role_permissions" ("role_id", "permission_id") VALUES
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Manager'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'get_cost_estimations')),
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Manager'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'add_cost_estimation'))
++ON CONFLICT ("role_id", "permission_id") DO NOTHING;
++
++-- Assign permissions to Collaborator role
++INSERT INTO "role_permissions" ("role_id", "permission_id") VALUES
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Collaborator'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'get_cost_estimations')),
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Collaborator'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'add_cost_estimation'))
++ON CONFLICT ("role_id", "permission_id") DO NOTHING;
++
++-- Assign permissions to Viewer role
++INSERT INTO "role_permissions" ("role_id", "permission_id") VALUES
++  ((SELECT "id" FROM "roles" WHERE "role_name" = 'Viewer'), (SELECT "id" FROM "permissions" WHERE "permission_key" = 'get_cost_estimations'))
++ON CONFLICT ("role_id", "permission_id") DO NOTHING;
+\ No newline at end of file
+```
+
+#### Suggestions for supabase/seeders/sample_data/106_roles_and_role_permissions.sql
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```sql
+// Suggested implementation
+```
+-->
+
+### yarn.lock (Modified)
+
+```lock
+diff --git yarn.lock yarn.lock
+index 7add14f..d90df19 100644
+--- yarn.lock
++++ yarn.lock
+@@ -4,19 +4,19 @@
+ 
+ "@isaacs/fs-minipass@^4.0.0":
+   version "4.0.1"
+-  resolved "https://registry.yarnpkg.com/@isaacs/fs-minipass/-/fs-minipass-4.0.1.tgz#2d59ae3ab4b38fb4270bfa23d30f8e2e86c7fe32"
++  resolved "https://registry.npmjs.org/@isaacs/fs-minipass/-/fs-minipass-4.0.1.tgz"
+   integrity sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==
+   dependencies:
+     minipass "^7.0.4"
+ 
+ agent-base@^7.1.2:
+   version "7.1.3"
+-  resolved "https://registry.yarnpkg.com/agent-base/-/agent-base-7.1.3.tgz#29435eb821bc4194633a5b89e5bc4703bafc25a1"
++  resolved "https://registry.npmjs.org/agent-base/-/agent-base-7.1.3.tgz"
+   integrity sha512-jRR5wdylq8CkOe6hei19GGZnxM6rBGwFl3Bg0YItGDimvjGtAvdZk4Pu6Cl4u4Igsws4a1fd1Vq3ezrhn4KmFw==
+ 
+ bin-links@^5.0.0:
+   version "5.0.0"
+-  resolved "https://registry.yarnpkg.com/bin-links/-/bin-links-5.0.0.tgz#2b0605b62dd5e1ddab3b92a3c4e24221cae06cca"
++  resolved "https://registry.npmjs.org/bin-links/-/bin-links-5.0.0.tgz"
+   integrity sha512-sdleLVfCjBtgO5cNjA2HVRvWBJAHs4zwenaCPMNJAJU0yNxpzj80IpjOIimkpkr+mhlA+how5poQtt53PygbHA==
+   dependencies:
+     cmd-shim "^7.0.0"
+@@ -27,29 +27,29 @@ bin-links@^5.0.0:
+ 
+ chownr@^3.0.0:
+   version "3.0.0"
+-  resolved "https://registry.yarnpkg.com/chownr/-/chownr-3.0.0.tgz#9855e64ecd240a9cc4267ce8a4aa5d24a1da15e4"
++  resolved "https://registry.npmjs.org/chownr/-/chownr-3.0.0.tgz"
+   integrity sha512-+IxzY9BZOQd/XuYPRmrvEVjF/nqj5kgT4kEq7VofrDoM1MxoRjEWkrCC3EtLi59TVawxTAn+orJwFQcrqEN1+g==
+ 
+ cmd-shim@^7.0.0:
+   version "7.0.0"
+-  resolved "https://registry.yarnpkg.com/cmd-shim/-/cmd-shim-7.0.0.tgz#23bcbf69fff52172f7e7c02374e18fb215826d95"
++  resolved "https://registry.npmjs.org/cmd-shim/-/cmd-shim-7.0.0.tgz"
+   integrity sha512-rtpaCbr164TPPh+zFdkWpCyZuKkjpAzODfaZCf/SVJZzJN+4bHQb/LP3Jzq5/+84um3XXY8r548XiWKSborwVw==
+ 
+ data-uri-to-buffer@^4.0.0:
+   version "4.0.1"
+-  resolved "https://registry.yarnpkg.com/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz#d8feb2b2881e6a4f58c2e08acfd0e2834e26222e"
++  resolved "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz"
+   integrity sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==
+ 
+ debug@4:
+   version "4.4.0"
+-  resolved "https://registry.yarnpkg.com/debug/-/debug-4.4.0.tgz#2b3f2aea2ffeb776477460267377dc8710faba8a"
++  resolved "https://registry.npmjs.org/debug/-/debug-4.4.0.tgz"
+   integrity sha512-6WTZ/IxCY/T6BALoZHaE4ctp9xm+Z5kY/pzYaCHRFeyVhojxlrm+46y68HA6hr0TcwEssoxNiDEUJQjfPZ/RYA==
+   dependencies:
+     ms "^2.1.3"
+ 
+ fetch-blob@^3.1.2, fetch-blob@^3.1.4:
+   version "3.2.0"
+-  resolved "https://registry.yarnpkg.com/fetch-blob/-/fetch-blob-3.2.0.tgz#f09b8d4bbd45adc6f0c20b7e787e793e309dcce9"
++  resolved "https://registry.npmjs.org/fetch-blob/-/fetch-blob-3.2.0.tgz"
+   integrity sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==
+   dependencies:
+     node-domexception "^1.0.0"
+@@ -57,14 +57,14 @@ fetch-blob@^3.1.2, fetch-blob@^3.1.4:
+ 
+ formdata-polyfill@^4.0.10:
+   version "4.0.10"
+-  resolved "https://registry.yarnpkg.com/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz#24807c31c9d402e002ab3d8c720144ceb8848423"
++  resolved "https://registry.npmjs.org/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz"
+   integrity sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==
+   dependencies:
+     fetch-blob "^3.1.2"
+ 
+ https-proxy-agent@^7.0.2:
+   version "7.0.6"
+-  resolved "https://registry.yarnpkg.com/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz#da8dfeac7da130b05c2ba4b59c9b6cd66611a6b9"
++  resolved "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz"
+   integrity sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==
+   dependencies:
+     agent-base "^7.1.2"
+@@ -72,39 +72,34 @@ https-proxy-agent@^7.0.2:
+ 
+ imurmurhash@^0.1.4:
+   version "0.1.4"
+-  resolved "https://registry.yarnpkg.com/imurmurhash/-/imurmurhash-0.1.4.tgz#9218b9b2b928a238b13dc4fb6b6d576f231453ea"
++  resolved "https://registry.npmjs.org/imurmurhash/-/imurmurhash-0.1.4.tgz"
+   integrity sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==
+ 
+ minipass@^7.0.4, minipass@^7.1.2:
+   version "7.1.2"
+-  resolved "https://registry.yarnpkg.com/minipass/-/minipass-7.1.2.tgz#93a9626ce5e5e66bd4db86849e7515e92340a707"
++  resolved "https://registry.npmjs.org/minipass/-/minipass-7.1.2.tgz"
+   integrity sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==
+ 
+-minizlib@^3.0.1:
+-  version "3.0.2"
+-  resolved "https://registry.yarnpkg.com/minizlib/-/minizlib-3.0.2.tgz#f33d638eb279f664439aa38dc5f91607468cb574"
+-  integrity sha512-oG62iEk+CYt5Xj2YqI5Xi9xWUeZhDI8jjQmC5oThVH5JGCTgIjr7ciJDzC7MBzYd//WvR1OTmP5Q38Q8ShQtVA==
++minizlib@^3.1.0:
++  version "3.1.0"
++  resolved "https://registry.npmjs.org/minizlib/-/minizlib-3.1.0.tgz"
++  integrity sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==
+   dependencies:
+     minipass "^7.1.2"
+ 
+-mkdirp@^3.0.1:
+-  version "3.0.1"
+-  resolved "https://registry.yarnpkg.com/mkdirp/-/mkdirp-3.0.1.tgz#e44e4c5607fb279c168241713cc6e0fea9adcb50"
+-  integrity sha512-+NsyUUAZDmo6YVHzL/stxSu3t9YS1iljliy3BSDrXJ/dkn1KYdmtZODGGjLcc9XLgVVpH4KshHB8XmZgMhaBXg==
+-
+ ms@^2.1.3:
+   version "2.1.3"
+-  resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.3.tgz#574c8138ce1d2b5861f0b44579dbadd60c6615b2"
++  resolved "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz"
+   integrity sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==
+ 
+ node-domexception@^1.0.0:
+   version "1.0.0"
+-  resolved "https://registry.yarnpkg.com/node-domexception/-/node-domexception-1.0.0.tgz#6888db46a1f71c0b76b3f7555016b63fe64766e5"
++  resolved "https://registry.npmjs.org/node-domexception/-/node-domexception-1.0.0.tgz"
+   integrity sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==
+ 
+ node-fetch@^3.3.2:
+   version "3.3.2"
+-  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-3.3.2.tgz#d1e889bacdf733b4ff3b2b243eb7a12866a0b78b"
++  resolved "https://registry.npmjs.org/node-fetch/-/node-fetch-3.3.2.tgz"
+   integrity sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==
+   dependencies:
+     data-uri-to-buffer "^4.0.0"
+@@ -113,54 +108,53 @@ node-fetch@^3.3.2:
+ 
+ npm-normalize-package-bin@^4.0.0:
+   version "4.0.0"
+-  resolved "https://registry.yarnpkg.com/npm-normalize-package-bin/-/npm-normalize-package-bin-4.0.0.tgz#df79e70cd0a113b77c02d1fe243c96b8e618acb1"
++  resolved "https://registry.npmjs.org/npm-normalize-package-bin/-/npm-normalize-package-bin-4.0.0.tgz"
+   integrity sha512-TZKxPvItzai9kN9H/TkmCtx/ZN/hvr3vUycjlfmH0ootY9yFBzNOpiXAdIn1Iteqsvk4lQn6B5PTrt+n6h8k/w==
+ 
+ proc-log@^5.0.0:
+   version "5.0.0"
+-  resolved "https://registry.yarnpkg.com/proc-log/-/proc-log-5.0.0.tgz#e6c93cf37aef33f835c53485f314f50ea906a9d8"
++  resolved "https://registry.npmjs.org/proc-log/-/proc-log-5.0.0.tgz"
+   integrity sha512-Azwzvl90HaF0aCz1JrDdXQykFakSSNPaPoiZ9fm5qJIMHioDZEi7OAdRwSm6rSoPtY3Qutnm3L7ogmg3dc+wbQ==
+ 
+ read-cmd-shim@^5.0.0:
+   version "5.0.0"
+-  resolved "https://registry.yarnpkg.com/read-cmd-shim/-/read-cmd-shim-5.0.0.tgz#6e5450492187a0749f6c80dcbef0debc1117acca"
++  resolved "https://registry.npmjs.org/read-cmd-shim/-/read-cmd-shim-5.0.0.tgz"
+   integrity sha512-SEbJV7tohp3DAAILbEMPXavBjAnMN0tVnh4+9G8ihV4Pq3HYF9h8QNez9zkJ1ILkv9G2BjdzwctznGZXgu/HGw==
+ 
+ signal-exit@^4.0.1:
+   version "4.1.0"
+-  resolved "https://registry.yarnpkg.com/signal-exit/-/signal-exit-4.1.0.tgz#952188c1cbd546070e2dd20d0f41c0ae0530cb04"
++  resolved "https://registry.npmjs.org/signal-exit/-/signal-exit-4.1.0.tgz"
+   integrity sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==
+ 
+ supabase@^2.22.12:
+-  version "2.22.12"
+-  resolved "https://registry.yarnpkg.com/supabase/-/supabase-2.22.12.tgz#56daab57b5627b888023197089b52ad6b2e165c6"
+-  integrity sha512-PWQT+uzwAXcamM/FK60CaWRjVwsX2SGW5vF7edbiTQC6vsNvTBnSIvd1yiXsIpq32uzQFu+iOrayxaTQytNiTw==
++  version "2.48.3"
++  resolved "https://registry.npmjs.org/supabase/-/supabase-2.48.3.tgz"
++  integrity sha512-92vjrWqRUQPX9eYgTYlSSVXfpjzsAa++IX7IEM99BoYvNS3Pl6VrsqGN06QWi4VaX7FlPjjHLp+aIjoeWXcBug==
+   dependencies:
+     bin-links "^5.0.0"
+     https-proxy-agent "^7.0.2"
+     node-fetch "^3.3.2"
+-    tar "7.4.3"
++    tar "7.5.1"
+ 
+-tar@7.4.3:
+-  version "7.4.3"
+-  resolved "https://registry.yarnpkg.com/tar/-/tar-7.4.3.tgz#88bbe9286a3fcd900e94592cda7a22b192e80571"
+-  integrity sha512-5S7Va8hKfV7W5U6g3aYxXmlPoZVAwUMy9AOKyF2fVuZa2UD3qZjg578OrLRt8PcNN1PleVaL/5/yYATNL0ICUw==
++tar@7.5.1:
++  version "7.5.1"
++  resolved "https://registry.npmjs.org/tar/-/tar-7.5.1.tgz"
++  integrity sha512-nlGpxf+hv0v7GkWBK2V9spgactGOp0qvfWRxUMjqHyzrt3SgwE48DIv/FhqPHJYLHpgW1opq3nERbz5Anq7n1g==
+   dependencies:
+     "@isaacs/fs-minipass" "^4.0.0"
+     chownr "^3.0.0"
+     minipass "^7.1.2"
+-    minizlib "^3.0.1"
+-    mkdirp "^3.0.1"
++    minizlib "^3.1.0"
+     yallist "^5.0.0"
+ 
+ web-streams-polyfill@^3.0.3:
+   version "3.3.3"
+-  resolved "https://registry.yarnpkg.com/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz#2073b91a2fdb1fbfbd401e7de0ac9f8214cecb4b"
++  resolved "https://registry.npmjs.org/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz"
+   integrity sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==
+ 
+ write-file-atomic@^6.0.0:
+   version "6.0.0"
+-  resolved "https://registry.yarnpkg.com/write-file-atomic/-/write-file-atomic-6.0.0.tgz#e9c89c8191b3ef0606bc79fb92681aa1aa16fa93"
++  resolved "https://registry.npmjs.org/write-file-atomic/-/write-file-atomic-6.0.0.tgz"
+   integrity sha512-GmqrO8WJ1NuzJ2DrziEI2o57jKAVIQNf8a18W3nCYU3H7PNWqCCVTeH6/NQE93CIllIgQS98rrmVkYgTX9fFJQ==
+   dependencies:
+     imurmurhash "^0.1.4"
+@@ -168,5 +162,5 @@ write-file-atomic@^6.0.0:
+ 
+ yallist@^5.0.0:
+   version "5.0.0"
+-  resolved "https://registry.yarnpkg.com/yallist/-/yallist-5.0.0.tgz#00e2de443639ed0d78fd87de0d27469fbcffb533"
++  resolved "https://registry.npmjs.org/yallist/-/yallist-5.0.0.tgz"
+   integrity sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==
+```
+
+#### Suggestions for yarn.lock
+
+<!-- Example suggestion format below -->
+<!--
+**Line XX:** ✅/❌ Comment about the code
+
+**Suggested Change:**
+
+```lock
+// Suggested implementation
+```
+-->
+
+## REVIEW INSTRUCTIONS
+Please review this PR with the following considerations:
+
+### 📋 RULE 1: DIGESTIBLE PR RULE
+**Reference:** For detailed guidelines, search: https://gist.github.com/ripplearcgit/551ccf7208a1dcf3f3edd27cac002214
+
+**Size Classification (Production Code Only):**
+- XS: <50 lines | S: 50-100 lines | M: 100-200 lines | L: 200+ lines
+- **Action Required:** If PR is >M size, recommend breaking into smaller, focused PRs
+- **Focus:** Each PR should have single, clear purpose and pass tests independently
+
+### 🧪 RULE 3: TEST DOUBLE PATTERN
+**Reference:** For detailed guidelines, search: https://gist.github.com/ripplearcgit/89687b7414f62a8c042b16b52e9ceb0b
+
+**Core Principle:** Test real integration between components, only fake external dependencies
+
+**Key Rules:**
+- ❌ **Avoid:** Fake everything approach (only fakes, no real implementations)
+- ✅ **Use:** Test Double pattern (real A + real B + fake external dependencies)
+- 🔒 **Forbidden:** Mock & Stub usage
+
+**When Testing Class A → Class B:**
+- Use **real implementation of B**
+- Swap out **B's external dependencies** with fakes (DB, Network, 3P libraries)
+- Test **real integration** and **real business logic**
+
+**Action Required:**
+- Verify tests use real implementations for business logic components
+- Check that only external dependencies (DB, network, 3P) are faked
+- Ensure BLoCs test real UseCases, UseCases test real Services, etc.
+
+### 🔍 RULE 4: GENERAL CODE REVIEW CRITERIA
+1. 📝 Code quality and best practices
+2. 🐛 Potential bugs or edge cases
+3. ⚡ Performance implications
+4. 🔒 Security concerns
+
+**Review Output Format:**
+Please provide detailed comments with context for each file. If issues are found that need to be addressed, include the summary table below. If no issues are found, omit the table entirely.
+
+## REVIEW SUMMARY
+
+**IMPORTANT:** Only include this table if you find issues that need to be addressed. If the PR has no outstanding issues, delete this entire section.
+
+| Issue Name | Description | Status | Notes |
+|------------|-------------|--------|-------|
+| [Brief issue name] | [Detailed description of the issue] | [Author to fill out] | [Author to fill out] |
+
+**Status Options (for PR Author to fill out - NOT for LLM):**
+
+**Notes Requirements (for PR Author to fill out - NOT for LLM):**
+- **If Author Disagree:** State the reason for disagreement
+- **If Agree and Have Addressed:** Describe what changes were made
+- **If Agree but Needs Another Story:** List the YouTrack story name for the refactor
+

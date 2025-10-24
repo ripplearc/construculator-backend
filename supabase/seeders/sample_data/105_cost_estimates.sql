@@ -1,4 +1,4 @@
--- Cost estimates seeder
+-- Cost Estimates Seeder
 -- This file creates sample cost estimates with various markup configurations
 
 INSERT INTO "cost_estimates" (
@@ -22,10 +22,10 @@ INSERT INTO "cost_estimates" (
   -- Downtown Office Complex - Overall markup estimate
   (
     'a50e8400-e29b-41d4-a716-446655440001',
-    '950e8400-e29b-41d4-a716-446655440001',
+    (SELECT "id" FROM "projects" WHERE "project_name" = 'Downtown Office Complex'),
     'Initial Construction Estimate',
     'Preliminary cost estimate for the downtown office complex construction including all major components',
-    '750e8400-e29b-41d4-a716-446655440000',
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
     'overall',
     'percentage',
     15.00,
@@ -42,10 +42,10 @@ INSERT INTO "cost_estimates" (
   -- Downtown Office Complex - Granular markup estimate
   (
     'a50e8400-e29b-41d4-a716-446655440002',
-    '950e8400-e29b-41d4-a716-446655440001',
+    (SELECT "id" FROM "projects" WHERE "project_name" = 'Downtown Office Complex'),
     'Detailed Cost Breakdown',
     'Detailed estimate with separate markup rates for materials, labor, and equipment',
-    '750e8400-e29b-41d4-a716-446655440000',
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
     'granular',
     NULL,
     NULL,
@@ -62,10 +62,10 @@ INSERT INTO "cost_estimates" (
   -- Residential Housing Development - Simple estimate
   (
     'a50e8400-e29b-41d4-a716-446655440003',
-    '950e8400-e29b-41d4-a716-446655440002',
+    (SELECT "id" FROM "projects" WHERE "project_name" = 'Residential Housing Development'),
     'Phase 1 Housing Units',
     'Cost estimate for the first 25 housing units in the residential development',
-    '750e8400-e29b-41d4-a716-446655440000',
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
     'overall',
     'amount',
     50000.00,
@@ -82,10 +82,10 @@ INSERT INTO "cost_estimates" (
   -- Shopping Mall Renovation - Complex estimate
   (
     'a50e8400-e29b-41d4-a716-446655440004',
-    '950e8400-e29b-41d4-a716-446655440003',
+    (SELECT "id" FROM "projects" WHERE "project_name" = 'Shopping Mall Renovation'),
     'Complete Renovation Estimate',
     'Comprehensive cost estimate for shopping mall renovation including structural changes and new installations',
-    '750e8400-e29b-41d4-a716-446655440000',
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
     'granular',
     NULL,
     NULL,
@@ -102,10 +102,10 @@ INSERT INTO "cost_estimates" (
   -- Industrial Warehouse - Basic estimate
   (
     'a50e8400-e29b-41d4-a716-446655440005',
-    '950e8400-e29b-41d4-a716-446655440004',
+    (SELECT "id" FROM "projects" WHERE "project_name" = 'Industrial Warehouse'),
     'Warehouse Construction Estimate',
     'Cost estimate for industrial warehouse construction including foundation, structure, and utilities',
-    '750e8400-e29b-41d4-a716-446655440000',
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
     'overall',
     'percentage',
     20.00,
@@ -122,10 +122,10 @@ INSERT INTO "cost_estimates" (
   -- Downtown Office Complex - Revised estimate
   (
     'a50e8400-e29b-41d4-a716-446655440006',
-    '950e8400-e29b-41d4-a716-446655440001',
+    (SELECT "id" FROM "projects" WHERE "project_name" = 'Downtown Office Complex'),
     'Revised Estimate v2.0',
     'Updated cost estimate after design changes and material price adjustments',
-    '750e8400-e29b-41d4-a716-446655440000',
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
     'granular',
     NULL,
     NULL,

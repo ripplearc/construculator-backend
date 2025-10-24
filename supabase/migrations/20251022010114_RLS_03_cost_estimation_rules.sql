@@ -48,11 +48,5 @@ CREATE POLICY "cost_estimates_insert_policy" ON "cost_estimates"
       'add_cost_estimation',
       auth.uid()
     )
-    AND EXISTS (
-      SELECT 1
-      FROM "users" u
-      WHERE u.id = cost_estimates.creator_user_id
-        AND u.credential_id = auth.uid()
-    )
   );
 
