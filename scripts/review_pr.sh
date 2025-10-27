@@ -228,33 +228,9 @@ echo "- **Focus:** Each PR should have single, clear purpose and pass tests inde
 echo "" >> "$OUTPUT_FILE"
 
 # =============================================================================
-# RULE 3: TEST DOUBLE PATTERN
-# =============================================================================
-echo "### 🧪 RULE 3: TEST DOUBLE PATTERN" >> "$OUTPUT_FILE"
-echo "**Reference:** For detailed guidelines, search: https://gist.github.com/ripplearcgit/89687b7414f62a8c042b16b52e9ceb0b" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-echo "**Core Principle:** Test real integration between components, only fake external dependencies" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-echo "**Key Rules:**" >> "$OUTPUT_FILE"
-echo "- ❌ **Avoid:** Fake everything approach (only fakes, no real implementations)" >> "$OUTPUT_FILE"
-echo "- ✅ **Use:** Test Double pattern (real A + real B + fake external dependencies)" >> "$OUTPUT_FILE"
-echo "- 🔒 **Forbidden:** Mock & Stub usage" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-echo "**When Testing Class A → Class B:**" >> "$OUTPUT_FILE"
-echo "- Use **real implementation of B**" >> "$OUTPUT_FILE"
-echo "- Swap out **B's external dependencies** with fakes (DB, Network, 3P libraries)" >> "$OUTPUT_FILE"
-echo "- Test **real integration** and **real business logic**" >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-echo "**Action Required:**" >> "$OUTPUT_FILE"
-echo "- Verify tests use real implementations for business logic components" >> "$OUTPUT_FILE"
-echo "- Check that only external dependencies (DB, network, 3P) are faked" >> "$OUTPUT_FILE"
-echo "- Ensure BLoCs test real UseCases, UseCases test real Services, etc." >> "$OUTPUT_FILE"
-echo "" >> "$OUTPUT_FILE"
-
-# =============================================================================
 # RULE 2: GENERAL CODE REVIEW CRITERIA
 # =============================================================================
-echo "### 🔍 RULE 4: GENERAL CODE REVIEW CRITERIA" >> "$OUTPUT_FILE"
+echo "### 🔍 RULE 2: GENERAL CODE REVIEW CRITERIA" >> "$OUTPUT_FILE"
 echo "1. 📝 Code quality and best practices" >> "$OUTPUT_FILE"
 echo "2. 🐛 Potential bugs or edge cases" >> "$OUTPUT_FILE"
 echo "3. ⚡ Performance implications" >> "$OUTPUT_FILE"
@@ -262,6 +238,97 @@ echo "4. 🔒 Security concerns" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 echo "**Review Output Format:**" >> "$OUTPUT_FILE"
 echo "Please provide detailed comments with context for each file. If issues are found that need to be addressed, include the summary table below. If no issues are found, omit the table entirely." >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+
+# =============================================================================
+# RULE 3: PERFORMANCE EFFICIENCY OF OPERATIONS AND POLICIES
+# =============================================================================
+echo "### ⚡RULE 3: PERFORMANCE EFFICIENCY OF OPERATIONS AND POLICIES" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Database Operations:**" >> "$OUTPUT_FILE"
+echo "- 🔍 **Query Optimization:** Check for N+1 queries, missing indexes, and inefficient joins" >> "$OUTPUT_FILE"
+echo "- 📊 **Data Access Patterns:** Verify appropriate use of SELECT, INSERT, UPDATE, DELETE operations" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**RLS (Row Level Security) Policies:**" >> "$OUTPUT_FILE"
+echo "- 🛡️ **Policy Efficiency:** Check if RLS policies are optimized and don't cause performance bottlenecks" >> "$OUTPUT_FILE"
+echo "- 🔐 **Security vs Performance:** Balance security requirements with query performance" >> "$OUTPUT_FILE"
+echo "- 📈 **Index Usage:** Ensure RLS policies can leverage existing indexes effectively" >> "$OUTPUT_FILE"
+echo "- 🎯 **Policy Scope:** Verify policies are scoped appropriately to avoid unnecessary checks" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**API Operations:**" >> "$OUTPUT_FILE"
+echo "- ⚡ **Response Times:** Check for potential slow endpoints or blocking operations" >> "$OUTPUT_FILE"
+echo "- 🔄 **Caching Strategy:** Verify appropriate use of caching mechanisms" >> "$OUTPUT_FILE"
+echo "- 📦 **Data Transfer:** Ensure minimal data transfer and efficient serialization" >> "$OUTPUT_FILE"
+echo "- 🔀 **Concurrency:** Check for proper handling of concurrent requests and race conditions" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Migration and Seeder Performance:**" >> "$OUTPUT_FILE"
+echo "- 🚀 **Migration Speed:** Verify migrations run efficiently without blocking production" >> "$OUTPUT_FILE"
+echo "- 📊 **Seeder Optimization:** Check if seeders use bulk operations and proper indexing" >> "$OUTPUT_FILE"
+echo "- 🔄 **Rollback Strategy:** Ensure migrations can be rolled back efficiently" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+
+# =============================================================================
+# RULE 4: SAFETY AND RELIABILITY
+# =============================================================================
+echo "### 🛡️ RULE 4: SAFETY AND RELIABILITY" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Data Safety:**" >> "$OUTPUT_FILE"
+echo "- 🔒 **Data Integrity:** Verify foreign key constraints, check constraints, and data validation" >> "$OUTPUT_FILE"
+echo "- 🔄 **Transaction Safety:** Ensure proper use of transactions and rollback mechanisms" >> "$OUTPUT_FILE"
+echo "- 📊 **Data Consistency:** Verify data remains consistent across related tables and operations" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Operational Safety:**" >> "$OUTPUT_FILE"
+echo "- ⚠️ **Breaking Changes:** Check for backward compatibility and migration safety" >> "$OUTPUT_FILE"
+echo "- 🔄 **Deployment Safety:** Verify zero-downtime deployment strategies where applicable" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Security Safety:**" >> "$OUTPUT_FILE"
+echo "- 🔐 **Sensitive Data:** Verify proper handling of PII, passwords, and sensitive information" >> "$OUTPUT_FILE"
+echo "- 🛡️ **RLS Policy Safety:** Check RLS policies don't accidentally expose or restrict data" >> "$OUTPUT_FILE"
+echo "- 🔑 **Permission Safety:** Verify role-based access controls are properly implemented" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+
+# =============================================================================
+# RULE 5: RLS POLICY CORRECTNESS AND SECURITY EVALUATION
+# =============================================================================
+echo "### 🔐 RULE 5: RLS POLICY CORRECTNESS AND SECURITY EVALUATION" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**RLS Policy Analysis:**" >> "$OUTPUT_FILE"
+echo "- 🎯 **Policy Logic:** Verify RLS policies implement the intended access control logic correctly" >> "$OUTPUT_FILE"
+echo "- 🔍 **Policy Coverage:** Check that all necessary tables have appropriate RLS policies enabled" >> "$OUTPUT_FILE"
+echo "- 🚫 **Policy Gaps:** Identify any tables or operations that lack proper RLS protection" >> "$OUTPUT_FILE"
+echo "- 🔄 **Policy Consistency:** Ensure RLS policies are consistent across related tables and operations" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Security Hole Detection:**" >> "$OUTPUT_FILE"
+echo "- 🕳️ **Data Leakage:** Check for policies that might accidentally expose sensitive data" >> "$OUTPUT_FILE"
+echo "- 🔓 **Privilege Escalation:** Verify policies prevent users from accessing data they shouldn't" >> "$OUTPUT_FILE"
+echo "- 🎭 **Bypass Vulnerabilities:** Look for ways users might bypass RLS policies through direct queries" >> "$OUTPUT_FILE"
+echo "- 🔀 **Cross-User Access:** Ensure users cannot access other users' data inappropriately" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**RLS Implementation Quality:**" >> "$OUTPUT_FILE"
+echo "- 📝 **Policy Documentation:** Verify RLS policies are well-documented and understandable" >> "$OUTPUT_FILE"
+echo "- 🧪 **Policy Testing:** Ensure RLS policies are properly tested with various scenarios" >> "$OUTPUT_FILE"
+echo "- 🔄 **Policy Maintenance:** Check that policies can be easily maintained and updated" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+
+# =============================================================================
+# RULE 6: DATABASE SCHEMA AND MIGRATION INTEGRITY
+# =============================================================================
+echo "### 🗄️ RULE 6: DATABASE SCHEMA AND MIGRATION INTEGRITY" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Schema Design:**" >> "$OUTPUT_FILE"
+echo "- 🏗️ **Table Structure:** Verify proper table design with appropriate primary keys, foreign keys, and constraints" >> "$OUTPUT_FILE"
+echo "- 📊 **Data Types:** Check for appropriate data types and precision (e.g., decimal precision for financial data)" >> "$OUTPUT_FILE"
+echo "- 🔗 **Relationships:** Ensure foreign key relationships are properly defined and maintain referential integrity" >> "$OUTPUT_FILE"
+echo "- 📝 **Naming Conventions:** Verify consistent naming conventions for tables, columns, and constraints" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Migration Safety:**" >> "$OUTPUT_FILE"
+echo "- ⬆️ **Upward Compatibility:** Ensure migrations can be applied to existing databases without data loss" >> "$OUTPUT_FILE"
+echo "- ⬇️ **Downward Compatibility:** Verify migrations can be rolled back safely" >> "$OUTPUT_FILE"
+echo "- 🔄 **Migration Order:** Check that migration dependencies are properly ordered and numbered" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Enum and Type Management:**" >> "$OUTPUT_FILE"
+echo "- 📋 **Enum Consistency:** Verify enum values are consistent across the application" >> "$OUTPUT_FILE"
+echo "- 🔄 **Enum Evolution:** Check that enum changes don't break existing data" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
 # =============================================================================
