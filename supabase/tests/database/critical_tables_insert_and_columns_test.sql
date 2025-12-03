@@ -26,9 +26,9 @@ BEGIN
   -- Insert a dummy professional_role
   INSERT INTO professional_roles (id, name) VALUES ('66666666-6666-6666-6666-666666666666', 'Test Role');
   INSERT INTO users (
-    id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences
+    id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code
   ) VALUES (
-    user_id, credential_id, 'testuser@example.com', 'Test', 'User', '66666666-6666-6666-6666-666666666666', now(), 'active', '{}'
+    user_id, credential_id, 'testuser@example.com', 'Test', 'User', '66666666-6666-6666-6666-666666666666', now(), 'active', '{}', '+1'
   );
   INSERT INTO projects (id, project_name, creator_user_id, created_at, updated_at, project_status) VALUES (project_id, 'Test Project', user_id, now(), now(), 'active');
 END $$;
