@@ -10,6 +10,7 @@ CREATE POLICY "professional_roles_select_public" ON "professional_roles"
 -- - Anonymous users: can only see id, email, first_name, last_name, profile_photo_url
 -- - Authenticated users: full access to all columns
 -- =============================================================================
+-- TODO: https://ripplearc.youtrack.cloud/issue/CA-439/Backend-Implement-Secure-Email-Check-Function-and-Tighten-User-RLS-Policies
 CREATE POLICY "users_select_policy" ON "users"
   FOR SELECT
   USING (true);
