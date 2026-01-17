@@ -64,6 +64,10 @@ INSERT INTO "role_permissions" (
   (
     (SELECT "id" FROM "roles" WHERE "role_name" = 'Admin'),
     (SELECT "id" FROM "permissions" WHERE "permission_key" = 'delete_project')
+  ),
+  (
+    (SELECT "id" FROM "roles" WHERE "role_name" = 'Admin'),
+    (SELECT "id" FROM "permissions" WHERE "permission_key" = 'delete_cost_estimation')
   )
 ON CONFLICT ("role_id", "permission_id") DO NOTHING;
 
@@ -87,6 +91,10 @@ INSERT INTO "role_permissions" (
   (
     (SELECT "id" FROM "roles" WHERE "role_name" = 'Manager'),
     (SELECT "id" FROM "permissions" WHERE "permission_key" = 'edit_project')
+  ),
+  (
+    (SELECT "id" FROM "roles" WHERE "role_name" = 'Manager'),
+    (SELECT "id" FROM "permissions" WHERE "permission_key" = 'delete_cost_estimation')
   )
 ON CONFLICT ("role_id", "permission_id") DO NOTHING;
 
