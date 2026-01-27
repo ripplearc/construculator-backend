@@ -50,3 +50,15 @@ CREATE POLICY "cost_estimates_insert_policy" ON "cost_estimates"
     )
   );
 
+-- Policy for DELETE operations (removing cost estimates)
+-- Users can delete cost estimates if they have the 'delete_cost_estimation' permission for the project
+CREATE POLICY "cost_estimates_delete_policy" ON "cost_estimates"
+  FOR DELETE
+  USING (
+    "user_has_project_permission"(
+      project_id,
+      'delete_cost_estimation',
+      auth.uid()
+    )
+  );
+

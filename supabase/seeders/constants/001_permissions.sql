@@ -17,6 +17,11 @@ INSERT INTO "permissions" (
     'Permission to create and add new cost estimations',
     'project'
   ),
+  (
+    'delete_cost_estimation',
+    'Permission to delete cost estimations',
+    'project'
+  ),
   -- Insert permissions for project operations
   (
     'view_project',
