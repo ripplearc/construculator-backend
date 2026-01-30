@@ -61,4 +61,3 @@ CREATE POLICY "cost_estimates_delete_policy" ON "cost_estimates"
       auth.uid()
     )
   );
-
