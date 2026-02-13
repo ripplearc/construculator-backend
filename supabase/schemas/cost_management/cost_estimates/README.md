@@ -122,6 +122,31 @@ Permissions are checked via `user_has_project_permission()` function.
 - Delete related user_favorites
 - Mark related attachments as inactive
 
+### `log_cost_estimate_created()`
+**Trigger function** that runs after INSERT operations.
+
+**Behavior**:
+- Automatically logs estimate creation to `cost_estimate_logs`
+- Records estimate name and description in details
+- Uses creator_user_id as the performing user
+
+### `log_cost_estimate_updated()`
+**Trigger function** that runs after UPDATE when name or lock status changes.
+
+**Behavior**:
+- Logs rename events with old and new names
+- Logs lock/unlock events
+- Determines user from auth.uid() or falls back to creator_user_id
+- Only triggers when relevant fields change
+
+### `log_cost_estimate_deleted()`
+**Trigger function** that runs after soft delete (UPDATE with deleted_at).
+
+**Behavior**:
+- Logs deletion event to `cost_estimate_logs`
+- Records estimate name in description
+- Determines user from auth.uid() or falls back to creator_user_id
+
 ## Triggers
 
 1. `trigger_check_cost_estimate_update_permissions` - BEFORE UPDATE
@@ -132,6 +157,17 @@ Permissions are checked via `user_has_project_permission()` function.
 
 3. `trigger_handle_delete_cost_estimates` - AFTER UPDATE
    - Cleans up related records when soft deleted
+
+4. `trigger_log_cost_estimate_created` - AFTER INSERT
+   - Automatically logs estimate creation activity
+
+5. `trigger_log_cost_estimate_updated` - AFTER UPDATE
+   - Logs rename and lock/unlock activities
+   - Only fires when estimate_name or is_locked changes
+
+6. `trigger_log_cost_estimate_deleted` - AFTER UPDATE
+   - Logs deletion activity when estimate is soft deleted
+   - Only fires when deleted_at is set
 
 ## Indexes
 
