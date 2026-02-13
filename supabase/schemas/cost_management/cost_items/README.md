@@ -99,10 +99,47 @@ Users with access to a cost estimate can:
 - Converts to UPDATE setting `deleted_at = now()`
 - Returns NULL (prevents actual DELETE)
 
+### `log_cost_item_added()`
+**Trigger function** that runs after INSERT operations.
+
+**Behavior**:
+- Automatically logs item addition to `cost_estimate_logs`
+- Records item name, type, and description
+- Determines user from auth.uid() or estimate creator
+
+### `log_cost_item_edited()`
+**Trigger function** that runs after UPDATE when item fields change.
+
+**Behavior**:
+- Logs all field changes with old and new values
+- Uses single-pass jsonb aggregation for performance
+- Only logs when actual changes detected
+- Excludes metadata fields (id, created_at, etc.)
+- Stores changes in `editedFields` object with oldValue/newValue pairs
+
+### `log_cost_item_removed()`
+**Trigger function** that runs after soft delete (UPDATE with deleted_at).
+
+**Behavior**:
+- Logs item removal to `cost_estimate_logs`
+- Records item name and type
+- Determines user from auth.uid() or estimate creator
+
 ## Triggers
 
 1. `trigger_soft_delete_cost_items` - BEFORE DELETE
    - Converts hard deletes to soft deletes
+
+2. `trigger_log_cost_item_added` - AFTER INSERT
+   - Automatically logs item addition activity
+
+3. `trigger_log_cost_item_edited` - AFTER UPDATE
+   - Logs field changes when any tracked field is modified
+   - Tracks 17 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, and all labor fields
+
+4. `trigger_log_cost_item_removed` - AFTER UPDATE
+   - Logs removal activity when item is soft deleted
+   - Only fires when deleted_at is set
 
 ## Indexes
 
