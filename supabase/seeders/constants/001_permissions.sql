@@ -22,6 +22,16 @@ INSERT INTO "permissions" (
     'Permission to delete cost estimations',
     'project'
   ),
+  (
+    'edit_cost_estimation',
+    'Permission to edit cost estimation details',
+    'project'
+  ),
+  (
+    'lock_cost_estimation',
+    'Permission to lock and unlock cost estimations',
+    'project'
+  ),
   -- Insert permissions for project operations
   (
     'view_project',
