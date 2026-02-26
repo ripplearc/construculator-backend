@@ -332,6 +332,34 @@ echo "- 🔄 **Enum Evolution:** Check that enum changes don't break existing da
 echo "" >> "$OUTPUT_FILE"
 
 # =============================================================================
+# RULE 7: SCHEMA MODULE DOCUMENTATION REQUIREMENT
+# =============================================================================
+echo "### 📚 RULE 7: SCHEMA MODULE DOCUMENTATION REQUIREMENT" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Documentation Requirement:**" >> "$OUTPUT_FILE"
+echo "When any schema file is modified within a module (e.g., \`schemas/cost_management/cost_estimates/\`), the corresponding README.md in that module directory MUST be updated to reflect the changes." >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Schema Files Include:**" >> "$OUTPUT_FILE"
+echo "- 📊 **01_table.sql** - Table structure, columns, primary keys, foreign keys" >> "$OUTPUT_FILE"
+echo "- 🔍 **02_indexes.sql** - Database indexes for performance optimization" >> "$OUTPUT_FILE"
+echo "- ⚙️ **03_functions.sql** - PostgreSQL functions and stored procedures" >> "$OUTPUT_FILE"
+echo "- 🔔 **04_triggers.sql** - Database triggers for automated operations" >> "$OUTPUT_FILE"
+echo "- 🔐 **05_rls.sql** - Row Level Security policies for data access control" >> "$OUTPUT_FILE"
+echo "- 👁️ **views/** - Database views (if present in the module)" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**Why This Matters:**" >> "$OUTPUT_FILE"
+echo "Each module's README serves as the single source of truth for understanding the feature's data model, business rules, and technical constraints. Keeping it synchronized with schema changes ensures developers can quickly understand the database structure without needing to parse SQL files." >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "**What to Update in README:**" >> "$OUTPUT_FILE"
+echo "- Update the \"Table Structure\" section if columns or constraints changed" >> "$OUTPUT_FILE"
+echo "- Update \"Business Rules\" if triggers or functions implement new logic" >> "$OUTPUT_FILE"
+echo "- Update \"RLS Policies\" section if security policies changed" >> "$OUTPUT_FILE"
+echo "- Update \"Indexes\" section if performance optimization indexes changed" >> "$OUTPUT_FILE"
+echo "- Update \"Views\" section if database views were added or modified" >> "$OUTPUT_FILE"
+echo "- Add notes about any breaking changes or migration considerations" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+
+# =============================================================================
 # REVIEW SUMMARY TABLE
 # =============================================================================
 echo "## REVIEW SUMMARY" >> "$OUTPUT_FILE"
