@@ -26,7 +26,7 @@ BEGIN
     VALUES (e_id, 'labor', 'Test Item', '{}', 500.00, 'KSH');
   
   INSERT INTO cost_estimate_logs (estimate_id, activity, description, user_id, details)
-    VALUES (e_id, 'created', 'Test log', u_id, '{}');
+    VALUES (e_id, 'cost_estimation_created', 'Test log', u_id, '{}');
 
   INSERT INTO user_favorites (user_id, favoritable_type, cost_estimate_id)
     VALUES (u_id, 'cost_estimate', e_id);
