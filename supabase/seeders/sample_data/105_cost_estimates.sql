@@ -17,7 +17,9 @@ INSERT INTO "cost_estimates" (
   "equipment_markup_value_type",
   "equipment_markup_value",
   "total_cost",
-  "is_locked"
+  "is_locked",
+  "locked_by_user_id",
+  "locked_at"
 ) VALUES
   -- Downtown Office Complex - Overall markup estimate
   (
@@ -36,9 +38,11 @@ INSERT INTO "cost_estimates" (
     NULL,
     NULL,
     2500000.00,
-    false
+    false,
+    NULL,
+    NULL
   ),
-  
+
   -- Downtown Office Complex - Granular markup estimate
   (
     'a50e8400-e29b-41d4-a716-446655440002',
@@ -56,9 +60,11 @@ INSERT INTO "cost_estimates" (
     'percentage',
     10.00,
     2750000.00,
-    true
+    true,
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
+    '2025-06-15T10:30:00Z'
   ),
-  
+
   -- Residential Housing Development - Simple estimate
   (
     'a50e8400-e29b-41d4-a716-446655440003',
@@ -76,9 +82,11 @@ INSERT INTO "cost_estimates" (
     NULL,
     NULL,
     1200000.00,
-    false
+    false,
+    NULL,
+    NULL
   ),
-  
+
   -- Shopping Mall Renovation - Complex estimate
   (
     'a50e8400-e29b-41d4-a716-446655440004',
@@ -96,9 +104,11 @@ INSERT INTO "cost_estimates" (
     'amount',
     15000.00,
     1800000.00,
-    false
+    false,
+    NULL,
+    NULL
   ),
-  
+
   -- Industrial Warehouse - Basic estimate
   (
     'a50e8400-e29b-41d4-a716-446655440005',
@@ -116,9 +126,11 @@ INSERT INTO "cost_estimates" (
     NULL,
     NULL,
     3200000.00,
-    true
+    true,
+    (SELECT "id" FROM "users" WHERE "email" = 'seeder@example.com'),
+    '2025-07-20T14:00:00Z'
   ),
-  
+
   -- Downtown Office Complex - Revised estimate
   (
     'a50e8400-e29b-41d4-a716-446655440006',
@@ -136,6 +148,8 @@ INSERT INTO "cost_estimates" (
     'percentage',
     12.00,
     2900000.00,
-    false
+    false,
+    NULL,
+    NULL
   )
 ON CONFLICT ("id") DO NOTHING;
