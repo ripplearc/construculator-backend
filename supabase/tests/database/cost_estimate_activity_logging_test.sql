@@ -3,7 +3,7 @@
 -- Uses pgTAP framework for comprehensive testing
 
 begin;
-select plan(21);
+select plan(40);
 
 DO $$
 DECLARE
@@ -214,6 +214,160 @@ SELECT is(
   (SELECT details->>'costFileId' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_file_deleted' LIMIT 1),
   'cccccccc-cccc-cccc-cccc-cccccccccccc',
   'File deletion details contains fileId'
+);
+
+-- =============================================================
+-- Test 8: Cost Item Addition logged with correct details
+-- =============================================================
+DO $$
+BEGIN
+  INSERT INTO cost_items (
+    id, estimate_id, item_name, item_type, unit_price, quantity, unit_measurement, 
+    calculation, item_total_cost, currency
+  ) VALUES (
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::uuid,
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid,
+    'Test Cost Item',
+    'material',
+    100.00,
+    5,
+    'units',
+    '{}'::jsonb,
+    500.00,
+    'USD'
+  );
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*) FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_added'),
+  1::bigint,
+  'Cost item addition logged'
+);
+
+SELECT is(
+  (SELECT description FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_added' LIMIT 1),
+  'Cost item added: Test Cost Item',
+  'Cost item added description is correct'
+);
+
+SELECT is(
+  (SELECT user_id FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_added' LIMIT 1),
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  'Cost item added log has correct user_id'
+);
+
+SELECT is(
+  (SELECT details->>'costItemId' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_added' LIMIT 1),
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'Cost item added details contains costItemId'
+);
+
+SELECT is(
+  (SELECT details->>'costItemType' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_added' LIMIT 1),
+  'material',
+  'Cost item added details contains costItemType'
+);
+
+-- =============================================================
+-- Test 9: Cost Item Edit logged with correct details
+-- =============================================================
+DO $$
+BEGIN
+  UPDATE cost_items 
+  SET item_name = 'Updated Cost Item', unit_price = 150.00
+  WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*) FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited'),
+  1::bigint,
+  'Cost item edit logged'
+);
+
+SELECT is(
+  (SELECT description FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  'Cost item edited: Updated Cost Item',
+  'Cost item edited description is correct'
+);
+
+SELECT is(
+  (SELECT user_id FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  'Cost item edited log has correct user_id'
+);
+
+SELECT is(
+  (SELECT details->>'costItemId' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'Cost item edited details contains costItemId'
+);
+
+SELECT is(
+  (SELECT details->>'costItemType' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  'material',
+  'Cost item edited details contains costItemType'
+);
+
+SELECT is(
+  (SELECT (details->'editedFields'->'item_name'->>'oldValue') FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  'Test Cost Item',
+  'Cost item edited details contains old item_name'
+);
+
+SELECT is(
+  (SELECT (details->'editedFields'->'item_name'->>'newValue') FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  'Updated Cost Item',
+  'Cost item edited details contains new item_name'
+);
+
+SELECT is(
+  (SELECT (details->'editedFields'->'unit_price'->>'oldValue')::numeric FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  100.00,
+  'Cost item edited details contains old unit_price'
+);
+
+SELECT is(
+  (SELECT (details->'editedFields'->'unit_price'->>'newValue')::numeric FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
+  150.00,
+  'Cost item edited details contains new unit_price'
+);
+
+-- =============================================================
+-- Test 10: Cost Item Removal logged with correct details
+-- =============================================================
+DO $$
+BEGIN
+  UPDATE cost_items SET deleted_at = now() WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*) FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_removed'),
+  1::bigint,
+  'Cost item removal logged'
+);
+
+SELECT is(
+  (SELECT description FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_removed' LIMIT 1),
+  'Cost item removed: Updated Cost Item',
+  'Cost item removed description is correct'
+);
+
+SELECT is(
+  (SELECT user_id FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_removed' LIMIT 1),
+  '11111111-1111-1111-1111-111111111111'::uuid,
+  'Cost item removed log has correct user_id'
+);
+
+SELECT is(
+  (SELECT details->>'costItemId' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_removed' LIMIT 1),
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'Cost item removed details contains costItemId'
+);
+
+SELECT is(
+  (SELECT details->>'costItemType' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_removed' LIMIT 1),
+  'material',
+  'Cost item removed details contains costItemType'
 );
 
 select * from finish();

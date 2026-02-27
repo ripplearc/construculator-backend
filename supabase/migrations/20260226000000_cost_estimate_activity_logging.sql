@@ -202,7 +202,7 @@ DECLARE
   v_user_id uuid;
   v_estimate_id uuid;
 BEGIN
-  -- Get the current user's ID from auth.uid()
+   
   SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
 
   -- If no user found from auth, use uploaded_by_user_id
@@ -248,7 +248,7 @@ DECLARE
   v_user_id uuid;
   v_estimate_id uuid;
 BEGIN
-  -- Get the current user's ID from auth.uid()
+
   SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
 
   -- If no user found from auth, use uploaded_by_user_id
@@ -298,3 +298,169 @@ CREATE OR REPLACE TRIGGER "trigger_log_cost_file_deleted"
 AFTER DELETE ON "public"."cost_files"
 FOR EACH ROW
 EXECUTE FUNCTION "public"."log_cost_file_deleted"();
+
+-- ============================================================================
+-- COST ITEMS LOGGING FUNCTIONS
+-- ============================================================================
+
+-- Log Cost Item Addition
+-- Triggered after INSERT on cost_items
+
+CREATE OR REPLACE FUNCTION "public"."log_cost_item_added"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+   
+  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+
+  -- If no user found from auth, get creator from cost_estimate
+  IF v_user_id IS NULL THEN
+    SELECT creator_user_id INTO v_user_id
+    FROM cost_estimates
+    WHERE id = NEW.estimate_id;
+  END IF;
+
+  PERFORM log_cost_estimate_activity(
+    NEW.estimate_id,
+    'cost_item_added',
+    'Cost item added: ' || NEW.item_name,
+    v_user_id,
+    jsonb_build_object(
+      'costItemId', NEW.id::text,
+      'costItemType', NEW.item_type::text,
+      'description', COALESCE(NEW.description, '')
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."log_cost_item_added"() OWNER TO "postgres";
+
+
+-- Log Cost Item Edits
+-- Triggered after UPDATE on cost_items when fields change
+
+CREATE OR REPLACE FUNCTION "public"."log_cost_item_edited"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_edited_fields jsonb;
+  v_old_json jsonb;
+  v_new_json jsonb;
+BEGIN
+  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  IF v_user_id IS NULL THEN
+    SELECT creator_user_id INTO v_user_id FROM cost_estimates WHERE id = NEW.estimate_id;
+  END IF;
+
+  -- Convert rows to jsonb once, excluding metadata fields
+  v_old_json := to_jsonb(OLD) - 'id' - 'estimate_id' - 'created_at' - 'updated_at' - 'deleted_at';
+  v_new_json := to_jsonb(NEW) - 'id' - 'estimate_id' - 'created_at' - 'updated_at' - 'deleted_at';
+
+  -- Single-pass aggregation: no loop, no concatenations
+  SELECT jsonb_object_agg(key, jsonb_build_object('oldValue', v_old_json->key, 'newValue', v_new_json->key))
+  INTO v_edited_fields
+  FROM jsonb_each(v_old_json)
+  WHERE v_old_json->key IS DISTINCT FROM v_new_json->key;
+
+  -- Only log if there are changes
+  IF v_edited_fields IS NOT NULL THEN
+    PERFORM log_cost_estimate_activity(
+      NEW.estimate_id, 'cost_item_edited', 'Cost item edited: ' || NEW.item_name,
+      v_user_id, jsonb_build_object('costItemId', NEW.id::text, 'costItemType', NEW.item_type::text, 'editedFields', v_edited_fields)
+    );
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+ALTER FUNCTION "public"."log_cost_item_edited"() OWNER TO "postgres";
+
+
+-- Log Cost Item Removal
+-- Triggered after soft delete (UPDATE with deleted_at set)
+
+CREATE OR REPLACE FUNCTION "public"."log_cost_item_removed"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+   
+  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+
+  -- If no user found from auth, get creator from cost_estimate
+  IF v_user_id IS NULL THEN
+    SELECT creator_user_id INTO v_user_id
+    FROM cost_estimates
+    WHERE id = NEW.estimate_id;
+  END IF;
+
+  PERFORM log_cost_estimate_activity(
+    NEW.estimate_id,
+    'cost_item_removed',
+    'Cost item removed: ' || NEW.item_name,
+    v_user_id,
+    jsonb_build_object(
+      'costItemId', NEW.id::text,
+      'costItemType', NEW.item_type::text
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."log_cost_item_removed"() OWNER TO "postgres";
+
+
+-- ============================================================================
+-- TRIGGERS - COST ITEMS
+-- ============================================================================
+
+-- Log Cost Item Addition
+CREATE OR REPLACE TRIGGER "trigger_log_cost_item_added"
+AFTER INSERT ON "public"."cost_items"
+FOR EACH ROW
+EXECUTE FUNCTION "public"."log_cost_item_added"();
+
+
+-- Log Cost Item Updates
+CREATE OR REPLACE TRIGGER "trigger_log_cost_item_edited"
+AFTER UPDATE ON "public"."cost_items"
+FOR EACH ROW
+WHEN (
+  OLD.item_type IS DISTINCT FROM NEW.item_type OR
+  OLD.item_name IS DISTINCT FROM NEW.item_name OR
+  OLD.unit_price IS DISTINCT FROM NEW.unit_price OR
+  OLD.quantity IS DISTINCT FROM NEW.quantity OR
+  OLD.unit_measurement IS DISTINCT FROM NEW.unit_measurement OR
+  OLD.calculation IS DISTINCT FROM NEW.calculation OR
+  OLD.item_total_cost IS DISTINCT FROM NEW.item_total_cost OR
+  OLD.currency IS DISTINCT FROM NEW.currency OR
+  OLD.brand IS DISTINCT FROM NEW.brand OR
+  OLD.product_link IS DISTINCT FROM NEW.product_link OR
+  OLD.description IS DISTINCT FROM NEW.description OR
+  OLD.labor_calc_method IS DISTINCT FROM NEW.labor_calc_method OR
+  OLD.labor_days IS DISTINCT FROM NEW.labor_days OR
+  OLD.labor_hours IS DISTINCT FROM NEW.labor_hours OR
+  OLD.labor_unit_type IS DISTINCT FROM NEW.labor_unit_type OR
+  OLD.labor_unit_value IS DISTINCT FROM NEW.labor_unit_value OR
+  OLD.crew_size IS DISTINCT FROM NEW.crew_size
+)
+EXECUTE FUNCTION "public"."log_cost_item_edited"();
+
+
+-- Log Cost Item Removal
+CREATE OR REPLACE TRIGGER "trigger_log_cost_item_removed"
+AFTER UPDATE ON "public"."cost_items"
+FOR EACH ROW
+WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)
+EXECUTE FUNCTION "public"."log_cost_item_removed"();
+
