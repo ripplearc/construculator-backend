@@ -167,3 +167,25 @@ CREATE TYPE "public"."user_profile_status_enum" AS ENUM (
 
 
 ALTER TYPE "public"."user_profile_status_enum" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."cost_estimation_activity_type_enum" AS ENUM (
+    'cost_estimation_created',
+    'cost_estimation_renamed',
+    'cost_estimation_exported',
+    'cost_estimation_locked',
+    'cost_estimation_unlocked',
+    'cost_estimation_deleted',
+    'cost_item_added',
+    'cost_item_edited',
+    'cost_item_removed',
+    'cost_item_duplicated',
+    'task_assigned',
+    'task_unassigned',
+    'cost_file_uploaded',
+    'cost_file_deleted',
+    'attachment_added',
+    'attachment_removed'
+);
+
+ALTER TYPE "public"."cost_estimation_activity_type_enum" OWNER TO "postgres";
