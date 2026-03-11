@@ -28,7 +28,7 @@ BEGIN
     VALUES (estimate_id, project_id, 'Test Estimate', user_id, 'overall', 500000.00, false);
   
   INSERT INTO cost_estimate_logs (id, estimate_id, activity, description, user_id, details, logged_at)
-    VALUES (log_id, estimate_id, 'created', 'Test log entry', user_id, '{}', now());
+    VALUES (log_id, estimate_id, 'cost_estimation_created', 'Test log entry', user_id, '{}', now());
 END $$;
 SELECT ok(true, 'Able to insert cost estimate log with required fields');
 
