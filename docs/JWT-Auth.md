@@ -48,6 +48,7 @@ Create a Postgres function that Supabase Auth can invoke during token generation
 CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
@@ -82,6 +83,12 @@ BEGIN
   );
 
   RETURN jsonb_build_object('claims', claims);
+EXCEPTION WHEN OTHERS THEN
+  -- Log the error and return unmodified event rather than empty claims
+  RAISE WARNING 'custom_access_token_hook failed for user %: %',
+    (event->>'user_id')::uuid, SQLERRM;
+  -- Return original event to prevent login failures due to hook errors
+  RETURN event;
 END;
 $$;
 
@@ -90,7 +97,13 @@ GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_aut
 REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) FROM authenticated, anon, public;
 ```
 
-If `SECURITY DEFINER` is not used, `supabase_auth_admin` must also have read access to the tables touched by the hook, either through dedicated grants and RLS policies or by an equivalent controlled access path.
+If you prefer not to use `SECURITY DEFINER`, then `supabase_auth_admin` needs direct read access to every table the hook touches. For this specific hook, that alternative would look like:
+
+```sql
+GRANT SELECT ON public.project_members, public.users, public.role_permissions, public.permissions TO supabase_auth_admin;
+```
+
+That grant-based approach can work, but it is broader than necessary for this use case. The recommended default for this repo is to keep the hook as `SECURITY DEFINER` and avoid granting table-level reads unless there is a specific operational reason to do so.
 
 ### Step 2: Create Helper Function for RLS Policies
 
@@ -113,6 +126,8 @@ AS $$
   ) ? p_permission_key
 $$;
 ```
+
+**Important**: This function is intentionally stateless and reads only from the JWT token in memory. It must never perform database queries, as that would reintroduce the performance problem this migration is solving. 
 
 ### Step 3: Configure Local Development
 
@@ -226,10 +241,21 @@ Call after mutations that affect permissions:
 
 ```dart
 // After updating user role or membership via RPC or admin action
-await _supabaseWrapper.refreshSession();
+try {
+  await _supabaseWrapper.refreshSession();
 
-// Now currentUser contains updated permissions
-final updatedPermissions = _supabaseWrapper.getProjectPermissions(projectId);
+  // Now currentUser contains updated permissions
+  final updatedPermissions = _supabaseWrapper.getProjectPermissions(projectId);
+} on AuthException catch (e) {
+  // Refresh token expired — force re-login
+  await _supabaseWrapper.signOut();
+  // Navigate to login screen
+  // Example: Navigator.of(context).pushReplacementNamed('/login');
+} catch (e) {
+  // Log and handle gracefully
+  print('Failed to refresh session: $e');
+  // Show error message to user
+}
 ```
 
 ### When to Refresh Session
@@ -307,13 +333,41 @@ SELECT * FROM cost_estimates WHERE project_id = 'project-uuid-here';
 
 ## Limitations & Considerations
 
-1. **JWT Size Limits**: JWTs are typically limited to ~4KB. Users with many projects may hit this limit. Monitor and consider alternatives if needed.
+1. **JWT Size Limits**: JWTs are typically limited to ~4KB. Users with many projects may hit this limit.
+
+   **Monitoring Threshold**: A user in 10 projects with 8 permissions each generates approximately 3KB of claims — already close to the limit. Monitor users who are members of **more than 15 projects** as they approach the 4KB threshold.
+
+   **Monitoring Query**: Run this periodically to identify users approaching the limit:
+
+   ```sql
+   SELECT
+     u.credential_id,
+     COUNT(DISTINCT pm.project_id) AS project_count,
+     COUNT(DISTINCT p.permission_key) AS total_permissions,
+     COUNT(DISTINCT pm.project_id) * 36 + COUNT(DISTINCT p.permission_key) * 20 AS estimated_bytes
+   FROM project_members pm
+   JOIN users u ON u.id = pm.user_id
+   JOIN role_permissions rp ON rp.role_id = pm.role_id
+   JOIN permissions p ON p.id = rp.permission_id
+   WHERE pm.membership_status = 'joined'
+   GROUP BY u.credential_id
+   HAVING COUNT(DISTINCT pm.project_id) > 15
+   ORDER BY estimated_bytes DESC
+   LIMIT 20;
+   ```
+
+   **Mitigation Strategy**: If users start hitting the limit, consider migrating to **scoped tokens per active project** where the JWT contains full permissions for only the currently active project. This requires the frontend to call `refreshSession()` when switching projects, but keeps tokens small regardless of total project count.
 
 2. **Permission Freshness**: Permissions only update when JWT refreshes. Clients must call `refreshSession()` explicitly, or wait for automatic token expiry (configure short expiry like 15-60 minutes).
 
 3. **Hook Reliability**: If the hook function errors, token generation will fail. Ensure the hook function is well-tested and handles edge cases.
 
 4. **Phased Migration**: Start with one table (`cost_estimates`) to validate performance and correctness before migrating all project-scoped tables.
+
+   **Phase 1 Exit Criteria (cost_estimates)**:
+   - [ ] Hook deployed and verified in local + staging environments
+   - [ ] `cost_estimates` RLS policies migrated to use `jwt_has_project_permission`
+   - [ ] pgTAP tests updated and passing for new JWT-based policies
 
 ## References
 
