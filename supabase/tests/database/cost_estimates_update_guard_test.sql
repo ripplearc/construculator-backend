@@ -52,7 +52,14 @@ BEGIN
 END $$;
 
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
+    }
+  }
+}', true);
 
 -- =============================================================
 -- Test 1: Immutable guard blocks creator_user_id change
@@ -67,7 +74,14 @@ SELECT throws_ok(
 -- =============================================================
 -- Test 2: Collaborator (no lock permission) cannot lock estimate
 -- =============================================================
-SELECT set_config('request.jwt.claims', '{"sub":"99999999-9999-9999-9999-999999999999"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "99999999-9999-9999-9999-999999999999",
+  "app_metadata": {
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT throws_ok(
   $$ UPDATE cost_estimates SET is_locked = true WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -79,7 +93,14 @@ SELECT throws_ok(
 -- =============================================================
 -- Test 3: Admin can lock by setting is_locked = true
 -- =============================================================
-SELECT set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT lives_ok(
   $$ UPDATE cost_estimates SET is_locked = true WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -109,7 +130,14 @@ SELECT isnt_empty(
 -- Test 6: Admin can unlock by setting is_locked = false
 -- =============================================================
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT lives_ok(
   $$ UPDATE cost_estimates SET is_locked = false WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -130,7 +158,14 @@ SELECT is_empty(
 -- Test 8: Collaborator can update estimate_name (allowed column)
 -- =============================================================
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"99999999-9999-9999-9999-999999999999"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "99999999-9999-9999-9999-999999999999",
+  "app_metadata": {
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT lives_ok(
   $$ UPDATE cost_estimates SET estimate_name = 'Renamed Estimate' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -152,7 +187,14 @@ SELECT is(
 -- Test 10: Viewer without edit_cost_estimation blocked by RLS
 -- =============================================================
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-dddd-dddd-dddddddddddd"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+  "app_metadata": {
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations"]
+    }
+  }
+}', true);
 
 UPDATE cost_estimates SET estimate_name = 'Should Not Change' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
