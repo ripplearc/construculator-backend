@@ -3,7 +3,7 @@
 -- Uses pgTAP framework for comprehensive testing
 
 begin;
-select plan(21);
+select plan(22);
 
 DO $$
 DECLARE
@@ -55,6 +55,7 @@ SELECT matches(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   UPDATE cost_estimates SET estimate_name = 'Renamed Estimate' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 END $$;
 
@@ -93,6 +94,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   UPDATE cost_estimates SET is_locked = true WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 END $$;
 
@@ -114,6 +116,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   UPDATE cost_estimates SET is_locked = false WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 END $$;
 
@@ -134,15 +137,16 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   INSERT INTO cost_files (
     id, project_id, filename, content_type, file_size_bytes, uploaded_by_user_id, file_url, version
   ) VALUES (
-    'cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid, 
-    '33333333-3333-3333-3333-333333333333'::uuid, 
-    'test_file.pdf', 
-    'application/pdf', 
-    1024, 
-    '11111111-1111-1111-1111-111111111111'::uuid, 
+    'cccccccc-cccc-cccc-cccc-cccccccccccc'::uuid,
+    '33333333-3333-3333-3333-333333333333'::uuid,
+    'test_file.pdf',
+    'application/pdf',
+    1024,
+    '11111111-1111-1111-1111-111111111111'::uuid,
     'http://test.com/project/cost_files/test.pdf',
     '1.0'
   );
@@ -183,6 +187,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   DELETE FROM cost_files WHERE id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 END $$;
 
@@ -214,6 +219,22 @@ SELECT is(
   (SELECT details->>'costFileId' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_file_deleted' LIMIT 1),
   'cccccccc-cccc-cccc-cccc-cccccccccccc',
   'File deletion details contains fileId'
+);
+
+-- =============================================================
+-- Test 8: no-auth context skips logging (e.g. service role update)
+-- =============================================================
+DO $$
+BEGIN
+  -- Ensure JWT claims are NOT set
+  PERFORM set_config('request.jwt.claims', '', true);
+  UPDATE cost_estimates SET estimate_name = 'Service Role Update' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*) FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_estimation_renamed' AND description LIKE '%Service Role Update%'),
+  0::bigint,
+  'No log entry created when no authenticated user (service role context)'
 );
 
 select * from finish();

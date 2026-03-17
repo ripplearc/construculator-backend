@@ -78,12 +78,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_updated"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, fall back to creator
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    v_user_id := NEW.creator_user_id;
+    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   -- Log name change (Renamed)
@@ -137,11 +153,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_deleted"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    v_user_id := NEW.creator_user_id;
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   PERFORM log_cost_estimate_activity(
@@ -201,13 +234,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_file_uploaded"() RETURNS "trigger"
 DECLARE
   v_user_id uuid;
   v_estimate_id uuid;
+  v_auth_uid text;
 BEGIN
-  -- Get the current user's ID from auth.uid()
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, use uploaded_by_user_id
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_file_uploaded: skipped logging for file %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    v_user_id := NEW.uploaded_by_user_id;
+    RAISE NOTICE 'log_cost_file_uploaded: skipped logging for file %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   -- Log to all estimates in this project
@@ -247,13 +295,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_file_deleted"() RETURNS "trigger"
 DECLARE
   v_user_id uuid;
   v_estimate_id uuid;
+  v_auth_uid text;
 BEGIN
-  -- Get the current user's ID from auth.uid()
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, use uploaded_by_user_id
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_file_deleted: skipped logging for file %, no authenticated user (service role or migration context)', OLD.id;
+    RETURN OLD;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    v_user_id := OLD.uploaded_by_user_id;
+    RAISE NOTICE 'log_cost_file_deleted: skipped logging for file %, user not found for credential %', OLD.id, v_auth_uid;
+    RETURN OLD;
   END IF;
 
   -- Log to all estimates in this project
