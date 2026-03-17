@@ -375,15 +375,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_item_added"() RETURNS "trigger"
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-   
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, get creator from cost_estimate
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_item_added: skipped logging for item %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    SELECT creator_user_id INTO v_user_id
-    FROM cost_estimates
-    WHERE id = NEW.estimate_id;
+    RAISE NOTICE 'log_cost_item_added: skipped logging for item %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   PERFORM log_cost_estimate_activity(
@@ -414,13 +427,31 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_item_edited"() RETURNS "trigger"
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
   v_edited_fields jsonb;
   v_old_json jsonb;
   v_new_json jsonb;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
+
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_item_edited: skipped logging for item %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    SELECT creator_user_id INTO v_user_id FROM cost_estimates WHERE id = NEW.estimate_id;
+    RAISE NOTICE 'log_cost_item_edited: skipped logging for item %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   -- Convert rows to jsonb once, excluding metadata fields
@@ -456,15 +487,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_item_removed"() RETURNS "trigger"
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-   
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, get creator from cost_estimate
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_item_removed: skipped logging for item %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    SELECT creator_user_id INTO v_user_id
-    FROM cost_estimates
-    WHERE id = NEW.estimate_id;
+    RAISE NOTICE 'log_cost_item_removed: skipped logging for item %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   PERFORM log_cost_estimate_activity(
@@ -501,23 +545,26 @@ CREATE OR REPLACE TRIGGER "trigger_log_cost_item_edited"
 AFTER UPDATE ON "public"."cost_items"
 FOR EACH ROW
 WHEN (
-  OLD.item_type IS DISTINCT FROM NEW.item_type OR
-  OLD.item_name IS DISTINCT FROM NEW.item_name OR
-  OLD.unit_price IS DISTINCT FROM NEW.unit_price OR
-  OLD.quantity IS DISTINCT FROM NEW.quantity OR
-  OLD.unit_measurement IS DISTINCT FROM NEW.unit_measurement OR
-  OLD.calculation IS DISTINCT FROM NEW.calculation OR
-  OLD.item_total_cost IS DISTINCT FROM NEW.item_total_cost OR
-  OLD.currency IS DISTINCT FROM NEW.currency OR
-  OLD.brand IS DISTINCT FROM NEW.brand OR
-  OLD.product_link IS DISTINCT FROM NEW.product_link OR
-  OLD.description IS DISTINCT FROM NEW.description OR
-  OLD.labor_calc_method IS DISTINCT FROM NEW.labor_calc_method OR
-  OLD.labor_days IS DISTINCT FROM NEW.labor_days OR
-  OLD.labor_hours IS DISTINCT FROM NEW.labor_hours OR
-  OLD.labor_unit_type IS DISTINCT FROM NEW.labor_unit_type OR
-  OLD.labor_unit_value IS DISTINCT FROM NEW.labor_unit_value OR
-  OLD.crew_size IS DISTINCT FROM NEW.crew_size
+  NOT (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) AND
+  (
+    OLD.item_type IS DISTINCT FROM NEW.item_type OR
+    OLD.item_name IS DISTINCT FROM NEW.item_name OR
+    OLD.unit_price IS DISTINCT FROM NEW.unit_price OR
+    OLD.quantity IS DISTINCT FROM NEW.quantity OR
+    OLD.unit_measurement IS DISTINCT FROM NEW.unit_measurement OR
+    OLD.calculation IS DISTINCT FROM NEW.calculation OR
+    OLD.item_total_cost IS DISTINCT FROM NEW.item_total_cost OR
+    OLD.currency IS DISTINCT FROM NEW.currency OR
+    OLD.brand IS DISTINCT FROM NEW.brand OR
+    OLD.product_link IS DISTINCT FROM NEW.product_link OR
+    OLD.description IS DISTINCT FROM NEW.description OR
+    OLD.labor_calc_method IS DISTINCT FROM NEW.labor_calc_method OR
+    OLD.labor_days IS DISTINCT FROM NEW.labor_days OR
+    OLD.labor_hours IS DISTINCT FROM NEW.labor_hours OR
+    OLD.labor_unit_type IS DISTINCT FROM NEW.labor_unit_type OR
+    OLD.labor_unit_value IS DISTINCT FROM NEW.labor_unit_value OR
+    OLD.crew_size IS DISTINCT FROM NEW.crew_size
+  )
 )
 EXECUTE FUNCTION "public"."log_cost_item_edited"();
 

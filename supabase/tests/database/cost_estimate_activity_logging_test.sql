@@ -3,7 +3,7 @@
 -- Uses pgTAP framework for comprehensive testing
 
 begin;
-select plan(44);
+select plan(45);
 
 DO $$
 DECLARE
@@ -242,6 +242,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   INSERT INTO cost_items (
     id, estimate_id, item_name, item_type, unit_price, quantity, unit_measurement, 
     calculation, item_total_cost, currency
@@ -300,6 +301,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   UPDATE cost_items 
   SET item_name = 'Updated Cost Item', unit_price = 150.00
   WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -370,6 +372,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
   UPDATE cost_items SET deleted_at = now() WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 END $$;
 
@@ -407,6 +410,46 @@ SELECT is(
   (SELECT details->>'costItemName' FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_removed' LIMIT 1),
   'Updated Cost Item',
   'Cost item removed details contains costItemName'
+);
+
+-- =============================================================
+-- Test 11: soft-delete with a simultaneous field change only produces cost_item_removed, not cost_item_edited
+-- =============================================================
+DO $$
+BEGIN
+  -- Re-authenticate
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  
+  -- Insert a fresh item for test 11 to avoid interference from previous tests
+  INSERT INTO cost_items (
+    id, estimate_id, item_name, item_type, unit_price, quantity, unit_measurement, 
+    calculation, item_total_cost, currency
+  ) VALUES (
+    'dddddddd-dddd-dddd-dddd-dddddddddddd'::uuid,
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid,
+    'Fresh Test Item',
+    'material',
+    200.00,
+    1,
+    'units',
+    '{}'::jsonb,
+    200.00,
+    'USD'
+  );
+
+  -- Soft delete while renaming
+  UPDATE cost_items
+  SET deleted_at = now(), item_name = 'Renamed Before Delete'
+  WHERE id = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*) FROM cost_estimate_logs
+   WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+     AND activity = 'cost_item_edited'
+     AND description = 'Cost item edited: Renamed Before Delete'),
+  0::bigint,
+  'No edit log when item is soft-deleted in the same UPDATE'
 );
 
 select * from finish();
