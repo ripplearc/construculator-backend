@@ -258,11 +258,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_deleted"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    v_user_id := NEW.creator_user_id;
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   PERFORM log_cost_estimate_activity(
