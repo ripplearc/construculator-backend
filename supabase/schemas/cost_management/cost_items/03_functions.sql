@@ -31,14 +31,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_item_added"() RETURNS "trigger"
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, get creator from cost_estimate
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_item_added: skipped logging for item %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    SELECT creator_user_id INTO v_user_id
-    FROM cost_estimates
-    WHERE id = NEW.estimate_id;
+    RAISE NOTICE 'log_cost_item_added: skipped logging for item %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   PERFORM log_cost_estimate_activity(
@@ -68,13 +82,31 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_item_edited"() RETURNS "trigger"
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
   v_edited_fields jsonb;
   v_old_json jsonb;
   v_new_json jsonb;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
+
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_item_edited: skipped logging for item %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    SELECT creator_user_id INTO v_user_id FROM cost_estimates WHERE id = NEW.estimate_id;
+    RAISE NOTICE 'log_cost_item_edited: skipped logging for item %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   -- Convert rows to jsonb once, excluding metadata fields
@@ -111,14 +143,28 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_item_removed"() RETURNS "trigger"
     AS $$
 DECLARE
   v_user_id uuid;
+  v_auth_uid text;
 BEGIN
-  SELECT id INTO v_user_id FROM users WHERE credential_id = auth.uid();
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
 
-  -- If no user found from auth, get creator from cost_estimate
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_item_removed: skipped logging for item %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    SELECT creator_user_id INTO v_user_id
-    FROM cost_estimates
-    WHERE id = NEW.estimate_id;
+    RAISE NOTICE 'log_cost_item_removed: skipped logging for item %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
   END IF;
 
   PERFORM log_cost_estimate_activity(
