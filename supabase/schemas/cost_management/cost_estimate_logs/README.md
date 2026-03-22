@@ -31,7 +31,7 @@ Logs provide an immutable audit trail of all actions on cost estimates:
 - Soft-deleted logs are automatically hidden by RLS policy
 
 ### 3. Cascade Delete
-When a `cost_estimate` is deleted (soft or hard), all its logs are **hard deleted** automatically (ON DELETE CASCADE foreign key constraint).
+When a `cost_estimate` is **hard deleted**, all its logs are hard deleted automatically (ON DELETE CASCADE foreign key constraint).
 
 This ensures orphaned logs are cleaned up when their parent estimate is removed.
 
