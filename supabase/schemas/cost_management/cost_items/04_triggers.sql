@@ -15,27 +15,33 @@ EXECUTE FUNCTION "public"."log_cost_item_added"();
 
 
 -- Log Cost Item Updates
+-- NOTE: This WHEN clause must be kept in sync with the cost_items table schema.
+-- The function body uses jsonb_each() and will capture any field listed here;
+-- add new tracked columns to both this clause and the exclusion list in the function.
 CREATE OR REPLACE TRIGGER "trigger_log_cost_item_edited"
 AFTER UPDATE ON "public"."cost_items"
 FOR EACH ROW
 WHEN (
-  OLD.item_type IS DISTINCT FROM NEW.item_type OR
-  OLD.item_name IS DISTINCT FROM NEW.item_name OR
-  OLD.unit_price IS DISTINCT FROM NEW.unit_price OR
-  OLD.quantity IS DISTINCT FROM NEW.quantity OR
-  OLD.unit_measurement IS DISTINCT FROM NEW.unit_measurement OR
-  OLD.calculation IS DISTINCT FROM NEW.calculation OR
-  OLD.item_total_cost IS DISTINCT FROM NEW.item_total_cost OR
-  OLD.currency IS DISTINCT FROM NEW.currency OR
-  OLD.brand IS DISTINCT FROM NEW.brand OR
-  OLD.product_link IS DISTINCT FROM NEW.product_link OR
-  OLD.description IS DISTINCT FROM NEW.description OR
-  OLD.labor_calc_method IS DISTINCT FROM NEW.labor_calc_method OR
-  OLD.labor_days IS DISTINCT FROM NEW.labor_days OR
-  OLD.labor_hours IS DISTINCT FROM NEW.labor_hours OR
-  OLD.labor_unit_type IS DISTINCT FROM NEW.labor_unit_type OR
-  OLD.labor_unit_value IS DISTINCT FROM NEW.labor_unit_value OR
-  OLD.crew_size IS DISTINCT FROM NEW.crew_size
+  NOT (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL) AND
+  (
+    OLD.item_type IS DISTINCT FROM NEW.item_type OR
+    OLD.item_name IS DISTINCT FROM NEW.item_name OR
+    OLD.unit_price IS DISTINCT FROM NEW.unit_price OR
+    OLD.quantity IS DISTINCT FROM NEW.quantity OR
+    OLD.unit_measurement IS DISTINCT FROM NEW.unit_measurement OR
+    OLD.calculation IS DISTINCT FROM NEW.calculation OR
+    OLD.item_total_cost IS DISTINCT FROM NEW.item_total_cost OR
+    OLD.currency IS DISTINCT FROM NEW.currency OR
+    OLD.brand IS DISTINCT FROM NEW.brand OR
+    OLD.product_link IS DISTINCT FROM NEW.product_link OR
+    OLD.description IS DISTINCT FROM NEW.description OR
+    OLD.labor_calc_method IS DISTINCT FROM NEW.labor_calc_method OR
+    OLD.labor_days IS DISTINCT FROM NEW.labor_days OR
+    OLD.labor_hours IS DISTINCT FROM NEW.labor_hours OR
+    OLD.labor_unit_type IS DISTINCT FROM NEW.labor_unit_type OR
+    OLD.labor_unit_value IS DISTINCT FROM NEW.labor_unit_value OR
+    OLD.crew_size IS DISTINCT FROM NEW.crew_size
+  )
 )
 EXECUTE FUNCTION "public"."log_cost_item_edited"();
 

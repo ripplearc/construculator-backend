@@ -136,7 +136,8 @@ Permissions are checked via `user_has_project_permission()` function.
 **Behavior**:
 - Logs rename events with old and new names
 - Logs lock/unlock events
-- Determines user from auth.uid() or falls back to creator_user_id
+- Determines user from JWT `sub` claim resolved via the `users` table
+- Skips logging (with NOTICE) if no authenticated user is present (service role / migration context)
 - Only triggers when relevant fields change
 
 ### `log_cost_estimate_deleted()`
@@ -145,7 +146,8 @@ Permissions are checked via `user_has_project_permission()` function.
 **Behavior**:
 - Logs deletion event to `cost_estimate_logs`
 - Records estimate name in description
-- Determines user from auth.uid() or falls back to creator_user_id
+- Determines user from JWT `sub` claim resolved via the `users` table
+- Skips logging (with NOTICE) if no authenticated user is present (service role / migration context)
 
 ## Triggers
 

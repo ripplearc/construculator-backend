@@ -62,6 +62,7 @@ BEGIN
     v_user_id,
     jsonb_build_object(
       'costItemId', NEW.id::text,
+      'costItemName', NEW.item_name,
       'costItemType', NEW.item_type::text,
       'description', COALESCE(NEW.description, '')
     )
@@ -123,7 +124,7 @@ BEGIN
   IF v_edited_fields IS NOT NULL THEN
     PERFORM log_cost_estimate_activity(
       NEW.estimate_id, 'cost_item_edited', 'Cost item edited: ' || NEW.item_name,
-      v_user_id, jsonb_build_object('costItemId', NEW.id::text, 'costItemType', NEW.item_type::text, 'editedFields', v_edited_fields)
+      v_user_id, jsonb_build_object('costItemId', NEW.id::text, 'costItemName', NEW.item_name, 'costItemType', NEW.item_type::text, 'editedFields', v_edited_fields)
     );
   END IF;
 
@@ -174,6 +175,7 @@ BEGIN
     v_user_id,
     jsonb_build_object(
       'costItemId', NEW.id::text,
+      'costItemName', NEW.item_name,
       'costItemType', NEW.item_type::text
     )
   );

@@ -105,7 +105,8 @@ Users with access to a cost estimate can:
 **Behavior**:
 - Automatically logs item addition to `cost_estimate_logs`
 - Records item name, type, and description
-- Determines user from auth.uid() or estimate creator
+- Determines user from JWT `sub` claim resolved via the `users` table
+- Skips logging (with NOTICE) if no authenticated user is present
 
 ### `log_cost_item_edited()`
 **Trigger function** that runs after UPDATE when item fields change.
@@ -123,7 +124,8 @@ Users with access to a cost estimate can:
 **Behavior**:
 - Logs item removal to `cost_estimate_logs`
 - Records item name and type
-- Determines user from auth.uid() or estimate creator
+- Determines user from JWT `sub` claim resolved via the `users` table
+- Skips logging (with NOTICE) if no authenticated user is present
 
 ## Triggers
 
