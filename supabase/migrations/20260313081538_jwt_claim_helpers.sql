@@ -5,6 +5,7 @@ CREATE OR REPLACE FUNCTION public.jwt_has_project_permission(
 )
 RETURNS boolean
 LANGUAGE sql
+SECURITY INVOKER
 STABLE
 AS $$
   SELECT COALESCE(

@@ -25,7 +25,7 @@ DECLARE
 BEGIN
   -- Set JWT claims with permissions
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000001",
     "app_metadata": {
       "projects": {
         "550e8400-e29b-41d4-a716-446655440000": ["get_cost_estimations", "edit_cost_estimation", "add_cost_estimation"]
@@ -51,7 +51,7 @@ DECLARE
 BEGIN
   -- Set JWT claims with permissions
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000002",
     "app_metadata": {
       "projects": {
         "550e8400-e29b-41d4-a716-446655440000": ["get_cost_estimations", "edit_cost_estimation"]
@@ -77,7 +77,7 @@ DECLARE
 BEGIN
   -- Set JWT claims without the project
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000003",
     "app_metadata": {
       "projects": {
         "550e8400-e29b-41d4-a716-446655440000": ["get_cost_estimations"]
@@ -103,7 +103,7 @@ DECLARE
 BEGIN
   -- Set JWT claims with empty projects
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000004",
     "app_metadata": {
       "projects": {}
     }
@@ -127,7 +127,7 @@ DECLARE
 BEGIN
   -- Set JWT claims without app_metadata
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000005",
     "email": "test@example.com"
   }', true);
 
@@ -148,7 +148,7 @@ DECLARE
 BEGIN
   -- Set JWT claims with multiple permissions
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000006",
     "app_metadata": {
       "projects": {
         "550e8400-e29b-41d4-a716-446655440000": [
@@ -185,7 +185,7 @@ DECLARE
 BEGIN
   -- Set JWT claims with permissions
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000007",
     "app_metadata": {
       "projects": {
         "550e8400-e29b-41d4-a716-446655440000": ["get_cost_estimations"]
@@ -212,7 +212,7 @@ DECLARE
 BEGIN
   -- Set JWT claims with multiple projects
   PERFORM set_config('request.jwt.claims', '{
-    "sub": "user-uuid-here",
+    "sub": "ffffffff-ffff-ffff-ffff-000000000008",
     "app_metadata": {
       "projects": {
         "550e8400-e29b-41d4-a716-446655440000": ["get_cost_estimations", "add_cost_estimation"],
