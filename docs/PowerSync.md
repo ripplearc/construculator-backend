@@ -12,7 +12,8 @@
 6. [Security Model](#6-security-model)
 7. [Local Development & Deployment](#7-local-development--deployment)
 8. [Pricing & Infrastructure](#8-pricing--infrastructure)
-9. [Common Pitfalls](#9-common-pitfalls)
+9. [Migration Guide](#9-migration-guide)
+10. [Common Pitfalls](#10-common-pitfalls)
 
 ---
 
@@ -405,6 +406,63 @@ client_auth:
   audience: ["authenticated"]
 ```
 
+### Using JWT Custom Claims for Authorization
+
+> **Important for Construculator:** If using the JWT-based permissions approach (PR #25), the JWT will contain custom `app_metadata` with project permissions:
+
+```json
+{
+  "app_metadata": {
+    "projects": {
+      "950e8400-e29b-41d4-a716-446655440001": [
+        "add_cost_estimation",
+        "delete_cost_estimation",
+        "edit_cost_estimation",
+        "get_cost_estimations",
+        "lock_cost_estimation",
+        "view_project"
+      ],
+      "950e8400-e29b-41d4-a716-446655440002": [
+        "view_project",
+        "get_cost_estimations"
+      ]
+    }
+  }
+}
+```
+
+PowerSync Edition 3 supports reading JWT claims directly in stream queries using `auth.jwt_claim()`:
+
+```yaml
+# Example: Using JWT claims instead of database queries for authorization
+user_projects:
+  auto_subscribe: true
+  query: |
+    SELECT id, project_name, description,
+           creator_user_id, project_status,
+           created_at, updated_at
+    FROM projects
+    WHERE id IN (
+      SELECT jsonb_object_keys(
+        auth.jwt_claim('app_metadata.projects')::jsonb
+      )::uuid
+    )
+```
+
+**Key Points:**
+- `auth.jwt_claim('app_metadata.projects')` reads the custom claim from the JWT
+- The JSONB `?` operator checks if a key exists in the JSON object (e.g., checking if a specific project_id exists in the user's projects)
+- `jsonb_object_keys()` extracts all keys (project IDs) from the projects object as a set of text values
+- This eliminates the need for `JOIN` with `project_members` if all authorization data is in the JWT
+- The JWT is cryptographically signed by Supabase — PowerSync trusts it after validation
+- When permissions change, the client must call `refreshSession()` to get updated claims
+
+**When to use JWT claims vs database queries:**
+- **JWT claims**: Faster, no database joins needed. Best when permissions are cached in the token (see JWT Auth documentation).
+- **Database queries**: Always up-to-date, no token refresh needed. Better for frequently changing permissions.
+
+For Construculator, if implementing PR #25 (JWT Project Claims), use JWT-based authorization. Otherwise, stick with the database query approach shown in Section 4.
+
 > ⚠️ **Cost estimate locking**
 > The `is_locked`, `locked_by_user_id`, and `locked_at` fields are server-authoritative. PowerSync syncs them down to all clients. The app must check `is_locked` before showing edit UI. If a user edits offline while another user locks the estimate, the upload will be rejected by Supabase RLS on the next sync — the app should handle this gracefully by showing a conflict message.
 
@@ -593,7 +651,163 @@ Self-hosted PowerSync runs as a single Docker service. EC2 instance sizing by lo
 
 ---
 
-## 9. Common Pitfalls
+## 9. Migration Guide to JWT-Based Authorization
+
+If implementing the JWT custom claims approach for permissions, the PowerSync stream configuration needs to be updated to use `auth.jwt_claim()` instead of database queries.
+
+#### Step 1: Verify JWT Claims Structure
+
+After deploying the custom access token hook (from PR #25), verify the JWT contains the expected structure:
+
+```bash
+# Decode a user's JWT to inspect claims
+# Use jwt.io or run this in your app after login:
+console.log(supabase.auth.currentUser?.appMetadata);
+```
+
+Expected output:
+```json
+{
+  "projects": {
+    "project-uuid-1": ["permission1", "permission2", ...],
+    "project-uuid-2": ["permission1", ...]
+  }
+}
+```
+
+#### Step 2: Update Stream Configuration
+
+**Before (Database Query Approach):**
+```yaml
+user_projects:
+  auto_subscribe: true
+  with:
+    accessible_projects: |
+      SELECT p.id FROM projects p
+      INNER JOIN project_members pm ON p.id = pm.project_id
+      INNER JOIN users u ON pm.user_id = u.id
+      WHERE u.credential_id = auth.user_id()
+        AND pm.membership_status = 'joined'
+        AND p.project_status != 'archived'
+  query: |
+    SELECT id, project_name, description,
+           creator_user_id, project_status,
+           created_at, updated_at
+    FROM projects
+    WHERE id IN accessible_projects
+```
+
+**After (JWT Claims Approach):**
+```yaml
+user_projects:
+  auto_subscribe: true
+  query: |
+    SELECT id, project_name, description,
+           creator_user_id, project_status,
+           created_at, updated_at
+    FROM projects
+    WHERE id IN (
+      SELECT jsonb_object_keys(
+        auth.jwt_claim('app_metadata.projects')::jsonb
+      )::uuid
+    )
+    AND project_status != 'archived'
+```
+
+#### Step 3: Update Cost Estimate Stream (On-Demand)
+
+**Before:**
+```yaml
+project_cost_data:
+  with:
+    accessible_projects: |
+      SELECT p.id FROM projects p
+      INNER JOIN project_members pm ON p.id = pm.project_id
+      INNER JOIN users u ON pm.user_id = u.id
+      WHERE u.credential_id = auth.user_id()
+        AND pm.membership_status = 'joined'
+    project_estimates: |
+      SELECT * FROM cost_estimates
+      WHERE project_id = subscription.parameter('project_id')
+        AND project_id IN accessible_projects
+  queries:
+    - |
+      SELECT ... FROM project_estimates
+    - |
+      SELECT ... FROM cost_items WHERE ...
+```
+
+**After:**
+```yaml
+project_cost_data:
+  with:
+    project_estimates: |
+      SELECT * FROM cost_estimates
+      WHERE project_id = subscription.parameter('project_id')
+        AND (auth.jwt_claim('app_metadata.projects')::jsonb) ? (subscription.parameter('project_id')::text)
+  queries:
+    - |
+      SELECT id, project_id, estimate_name,
+             total_cost, is_locked, locked_by_user_id,
+             locked_at, created_at, updated_at
+      FROM project_estimates
+    - |
+      SELECT ci.id, ci.estimate_id, ci.item_type,
+             ci.item_name, ci.unit_price, ci.quantity,
+             ci.item_total_cost, ci.currency,
+             ci.created_at, ci.updated_at
+      FROM cost_items ci
+      WHERE ci.estimate_id IN (
+        SELECT id FROM project_estimates
+      )
+```
+
+#### Step 4: Deploy and Test
+
+1. **Update sync-config.yaml** with the new stream definitions
+2. **Restart PowerSync service:**
+   ```bash
+   docker compose --file ./powersync/compose.yaml restart
+   ```
+3. **Test in the app:**
+   - Sign in with a test user
+   - Verify projects sync correctly
+   - Check that permission changes require `refreshSession()`
+   - Handle `refreshSession()` failures gracefully (offline or auth errors)
+   - Verify that stale permissions don't grant unauthorized access server-side (RLS still enforces)
+
+#### Step 5: Performance Comparison
+
+The JWT-based approach should show:
+- **Faster sync initialization** — no `project_members` joins
+- **Reduced database load** — PowerSync doesn't query membership table
+- **Same data synced** — users still see only their authorized projects
+
+Monitor PowerSync logs for any authorization failures:
+```bash
+docker logs powersync_demo --follow
+```
+
+### Rollback Plan
+
+If issues arise, revert `sync-config.yaml` to the database query approach and restart PowerSync. No data migration needed — this is configuration-only.
+
+### Migration Checklist
+
+- [ ] Custom access token hook deployed (PR #25)
+- [ ] JWT claims verified via jwt.io or app inspection
+- [ ] sync-config.yaml updated with JWT-based queries
+- [ ] PowerSync service restarted
+- [ ] App tested: projects sync correctly
+- [ ] App tested: `refreshSession()` updates permissions
+- [ ] App tested: offline behavior when JWT refresh fails
+- [ ] App tested: RLS still enforces permissions server-side
+- [ ] Performance verified: faster sync, lower DB load
+- [ ] Rollback plan documented and tested in staging
+
+---
+
+## 10. Common Pitfalls
 
 ### No data syncing to client
 
@@ -619,6 +833,13 @@ Self-hosted PowerSync runs as a single Docker service. EC2 instance sizing by lo
 - Ensure `PS_POSTGRESQL_URI` uses `sslmode=require` for Supabase Cloud (not `sslmode=disable`).
 - Verify all environment variables (`PS_API_TOKEN`, `PS_BACKEND_JWKS_URI`) are correctly set in production config.
 - Check that the PowerSync service can reach the Supabase JWKS URL — firewall or VPN rules may block it.
+
+### JWT claims not working in stream queries
+
+- Verify `auth.jwt_claim()` path uses dot notation: `'app_metadata.projects'` not `['app_metadata']['projects']`
+- When using JSONB operators like `?`, ensure values are explicitly cast: `subscription.parameter('project_id')::text`
+- Check JWT contains expected claims by decoding it at jwt.io
+- Ensure custom access token hook is deployed and users have refreshed their sessions
 
 ---
 
