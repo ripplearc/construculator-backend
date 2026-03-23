@@ -31,6 +31,7 @@ The `cost_files` table stores uploaded cost estimate template files (e.g., Excel
 - Sample files (`is_sample_file = true`) are templates/examples
 - They can be copied to create new project cost files
 - Sample files typically don't belong to a specific project (or have a special project)
+- **Note:** The actual sample files will be introduced in a follow-up PR.
 
 ### 3. Versioning
 - Files use semantic versioning or custom version strings
