@@ -31,6 +31,7 @@ The `cost_files` table stores uploaded cost estimate template files (e.g., Excel
 - Sample files (`is_sample_file = true`) are templates/examples
 - They can be copied to create new project cost files
 - Sample files typically don't belong to a specific project (or have a special project)
+- **Note:** The actual sample files will be introduced in a follow-up PR.
 
 ### 3. Versioning
 - Files use semantic versioning or custom version strings
@@ -54,7 +55,6 @@ Access to cost files typically follows project permissions. Users with access to
 ## Indexes
 
 Performance indexes for common queries:
-- `cost_files_project_id_idx` - Filter by project
 - `cost_files_active_idx` - Composite index for finding active file per project
 - `cost_files_uploaded_by_user_id_idx` - Filter by uploader
 - `cost_files_version_idx` - Filter/sort by version
@@ -142,7 +142,7 @@ ORDER BY version;
 
 - `projects` - Parent table
 - `users` - Uploader reference
-- `sample_cost_files` - Separate table for sample/template files
+- `sample_cost_files` - (Future) Separate table for sample/template files — to be introduced in a follow-up PR
 
 ## Best Practices
 
