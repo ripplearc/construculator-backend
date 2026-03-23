@@ -110,7 +110,6 @@ SELECT check_email_exists('user@example.com');
 
 **Columns Exposed**:
 - `id`
-- `credential_id`
 - `first_name`
 - `last_name`
 - `professional_role`
@@ -133,51 +132,40 @@ Performance indexes for common queries:
 - `users_professional_role_idx` - Filter by role
 - `users_user_status_idx` - Filter by status
 - `users_created_at_idx` - Sort by registration date
-- `idx_users_credential_id` - Fast auth lookups
-- `idx_users_id_credential` - Composite index for joins
 
 ## RLS Policies
 
-### Owner Full Access Policy
-**Name**: `users_owner_full_access`
+### Select Policy
+**Name**: `users_select_own`
 
 **Applies to**: Authenticated users
 
-**Access**: SELECT, INSERT, UPDATE, DELETE
+**Access**: SELECT
 
-**Rule**: Users can only access their own profile
+**Rule**: Users can read only their own profile
 ```sql
 auth.uid() = credential_id
 ```
 
-**Behavior**:
-- Users see only their own row
-- Users can update only their own data
-- No access to other users' profiles (unless additional policies exist)
+### Update Policy
+**Name**: `users_update_own`
 
-**Note**: For viewing other users (e.g., in project teams), use the `user_profiles` view or add specific permissive policies.
+**Applies to**: Authenticated users
+
+**Access**: UPDATE
+
+**Rule**: Users can update only their own profile
+```sql
+auth.uid() = credential_id
+```
+
+**Note**: INSERT is intentionally excluded from RLS. User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users` to prevent duplicate profile rows. Cross-user reads (e.g., viewing teammates) via `user_profiles` are deferred — the current `users_select_own` policy means the view only returns the caller's own row under `SECURITY INVOKER`. A separate policy will be introduced when team-based access is implemented.
 
 ## Usage Examples
 
 ### Creating a New User Profile
-```sql
--- After user signs up via auth, create profile
-INSERT INTO users (
-  credential_id,
-  email,
-  first_name,
-  last_name,
-  professional_role,
-  user_preferences
-) VALUES (
-  auth.uid(),  -- Links to authenticated user
-  'user@example.com',
-  'John',
-  'Doe',
-  (SELECT id FROM professional_roles WHERE name = 'General Contractor'),
-  '{"theme": "light", "language": "en"}'::jsonb
-);
-```
+
+User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users`, not through open client-side RLS. Direct `INSERT` on the `users` table is not permitted via RLS to prevent duplicate profiles.
 
 ### Updating User Profile
 ```sql
@@ -262,8 +250,8 @@ WHERE id = 'user-uuid';
 ## Best Practices
 
 ### Profile Creation
-- Always create user profile immediately after auth signup
-- Use database triggers or application logic
+- User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users`
+- Never expose a direct INSERT path through client-side RLS to prevent duplicate profiles
 - Ensure `credential_id` matches `auth.uid()`
 
 ### Email Validation

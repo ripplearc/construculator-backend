@@ -12,4 +12,4 @@ END;
 $$;
 
 ALTER FUNCTION "public"."set_current_timestamp_updated_at"() OWNER TO "postgres";
-COMMENT ON FUNCTION "public"."set_current_timestamp_updated_at"() IS 'Automatically updates updated_at column to current timestamp on row modification.';
+COMMENT ON FUNCTION "public"."set_current_timestamp_updated_at"() IS 'Shared trigger function. Sets updated_at to now() on any BEFORE UPDATE trigger. Safe for use across all tables with an updated_at column.';

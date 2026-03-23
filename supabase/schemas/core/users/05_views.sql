@@ -6,7 +6,6 @@
 
 CREATE OR REPLACE VIEW "public"."user_profiles" AS
  SELECT "users"."id",
-    "users"."credential_id",
     "users"."first_name",
     "users"."last_name",
     "users"."professional_role",
