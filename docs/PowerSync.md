@@ -6,14 +6,15 @@
 ## Table of Contents
 1. [What is PowerSync?](#1-what-is-powersync)
 2. [Core Concepts](#2-core-concepts)
-3. [How PowerSync Works with Supabase](#3-how-powersync-works-with-supabase)
-4. [Sync Streams Configuration](#4-sync-streams-configuration)
-5. [Flutter SDK Integration](#5-flutter-sdk-integration)
-6. [Security Model](#6-security-model)
-7. [Local Development & Deployment](#7-local-development--deployment)
-8. [Pricing & Infrastructure](#8-pricing--infrastructure)
-9. [Migration Guide](#9-migration-guide)
-10. [Common Pitfalls](#10-common-pitfalls)
+3. [Frequently Asked Questions](#3-frequently-asked-questions)
+4. [How PowerSync Works with Supabase](#4-how-powersync-works-with-supabase)
+5. [Sync Streams Configuration](#5-sync-streams-configuration)
+6. [Flutter SDK Integration](#6-flutter-sdk-integration)
+7. [Security Model](#7-security-model)
+8. [Local Development & Deployment](#8-local-development--deployment)
+9. [Pricing & Infrastructure](#9-pricing--infrastructure)
+10. [Migration Guide](#10-migration-guide)
+11. [Common Pitfalls](#11-common-pitfalls)
 
 ---
 
@@ -80,7 +81,81 @@ Inside stream queries, `auth.user_id()` returns the `sub` claim from the user's 
 
 ---
 
-## 3. How PowerSync Works with Supabase
+## 3. Frequently Asked Questions
+
+### Q: Who is responsible for maintaining the local SQLite database?
+
+Maintenance is a "relay race" between you and the SDK:
+
+- **You (the Architect)**: Define the schema in your Dart code (see Section 5, Step 1). You declare what tables and columns should exist locally.
+- **PowerSync SDK (the Manager)**: Physically creates the tables in SQLite and keeps the data inside them updated in real-time via sync.
+
+You never write raw `CREATE TABLE` SQL — the SDK handles that automatically based on your schema definition.
+
+### Q: Does PowerSync automatically create the tables in the local database?
+
+**Yes.** When your Flutter app initializes, the PowerSync SDK:
+
+1. Compares your Dart `Schema` definition against the local SQLite file
+2. Creates any missing tables automatically
+3. Applies schema changes when you update your Dart code
+
+You only define the schema in Dart — the SDK executes all the `CREATE TABLE` and `ALTER TABLE` commands for you.
+
+### Q: Do I have to "explicitly" sync every table?
+
+**Yes.** PowerSync only replicates tables that appear in a `SELECT` statement within your Sync Streams configuration (see Section 4).
+
+**Important:** If you add a table to Postgres but forget to add it to your PowerSync YAML config, no data for that table will ever reach user devices. This is intentional — it gives you fine-grained control over what syncs.
+
+### Q: When I update my Supabase Postgres database, what else do I need to update?
+
+It depends on the type of update:
+
+| Update Type | PowerSync | Flutter Schema | What Happens |
+|---|---|---|---|
+| **New rows** (INSERT/UPDATE/DELETE) | No change needed | No change needed | Automatic — PowerSync listens to WAL and pushes changes to devices |
+| **New columns in synced table** | Update Sync Stream query to SELECT new columns | Add columns to Dart schema | Both required — if you only update one, data won't sync correctly |
+| **New table** | Add new stream with SELECT query | Add new Table() to schema | Both required — table won't sync without stream config |
+| **Dropped columns** | Remove from SELECT query | Remove from Dart schema | Both recommended for consistency |
+
+**Key Rule:** The columns in your Sync Stream `SELECT` statements must match the columns in your Flutter `Schema` definition. Any mismatch causes silent data loss (see Section 10, Common Pitfalls).
+
+### Q: What happens if a write is rejected by Supabase (e.g., an RLS Denied error)?
+
+This is a critical scenario:
+
+1. **Local State**: The optimistic change remains in your local SQLite database
+2. **Upload Queue**: PowerSync stops retrying that transaction (if error handling is implemented correctly — see Section 5, Step 2)
+3. **Server State**: The change never reaches Supabase; server data is unchanged
+4. **User Experience**: The app should surface a conflict notification (requires custom UI implementation)
+
+**Without proper error handling**, an RLS denial will cause PowerSync to retry indefinitely, blocking the entire upload queue and preventing any subsequent writes from reaching the server.
+
+**Solution**: Implement the error handling pattern shown in Section 5, Step 2, which distinguishes permanent failures (RLS denials) from transient failures (network timeouts).
+
+### Q: How do I know if my RLS policies will reject a write?
+
+Test your RLS policies before deploying:
+
+```sql
+-- Test as a specific user
+SET LOCAL ROLE authenticated;
+SET LOCAL request.jwt.claims.sub = 'user-uuid-here';
+
+-- Try the write that your app will attempt
+UPDATE cost_estimates
+SET estimate_name = 'New Name'
+WHERE id = 'estimate-uuid';
+
+-- Check for "permission denied" errors
+```
+
+Also review the Conflict Resolution Strategy in Section 3 for how to handle rejected writes gracefully.
+
+---
+
+## 4. How PowerSync Works with Supabase
 
 ### Authentication Flow
 
@@ -101,6 +176,50 @@ Writes go to the local SQLite database first (optimistic), then get uploaded to 
 ![Write Flow](https://mermaid.ink/svg/pako:eNptk11v2jAUhv-K5atWShEhgRBfVELQoalsoou2SVNujHMarCZ25o-1HeK_zw4xaBu-SXze55zz-uuAmawAE6zhpwXBYMVprWhbCtSPjirDGe-oMOirBnUtvug6RDX60FhjQPnpNap42nADHtxIRpthfpVcPXpsK19BFe-C-cA1bimF8KD_AjPyqrnt2iOF7eiOanBFtakV6FIE2K_q7v7euSbooeIGVdTQILqo005WCap2I3gDZg3c3AbipN2FCoVlDLRGN1xo4_rfXhoNpCu3eiRoSTtjFSC2p6I-b4OTAvBkwQKyXSNp9bfs10sGZeXMXsx4xQHbNUGL7Uek_JlqE9TtetC-0Ya7VQL6siku_mhjgv0QGrLOnqV45qqF6h99kL8vNkj789pR9hIQaHTfB61A8P8yQ-qDUpfj8-OzdPbkr9N1inqm2MtXxJyFhrPzmkBUOMK14hUmRlmIcAuqpX6KDx4qsdlDCyUm7rdSLyUuxdGluMvxQ8o2ZClp6z0mz9TZjbDt_PYMT-EcVa4ZqKW0wmAymUz6Ipgc8BsmyXQ2ypLpOEmmcZbO43gW4XdM4iQfzbN8Ps_jdJblSZ4dI_y77zseZXGSZsl4PI0naZaleYTB3T-pPp1eZP8wj38AVIoY0w)
 
 > ✅ **Supabase is still the source of truth.** PowerSync is a sync layer, not a database replacement. All business logic, validation, and authorization for writes still runs on Supabase (via RLS, triggers, and edge functions). PowerSync just ensures the results of those writes get propagated back to all relevant devices.
+
+### Conflict Resolution Strategy
+
+When multiple users edit the same data offline, conflicts are routine in an offline-first architecture. Construculator uses the following conflict resolution approach:
+
+**Strategy: Server-Authoritative with Client Notification**
+
+| Scenario | Behavior | Resolution |
+|---|---|---|
+| **Concurrent edits, same record** | Last-write-wins based on server-side `updated_at` timestamp | Server accepts the last write; earlier writes are overwritten |
+| **RLS violation (permission denied)** | Upload rejected, optimistic local change persists | Client notified via error handler; user must manually resolve or discard |
+| **Lock conflict (cost estimates)** | Upload rejected if `is_locked` by another user | Client checks `is_locked` field; shows "locked by [user]" UI; must wait for unlock |
+| **Stale read during offline period** | User edits based on outdated data | Last-write-wins applies; no automatic merge; consider adding `updated_at` checks in RLS |
+
+**Implementation Details:**
+
+1. **Optimistic UI**: All writes go to local SQLite immediately. The app shows changes instantly, even if offline.
+
+2. **Server Validation**: When online, PowerSync uploads queued writes to Supabase. RLS, triggers, and business logic validate each change.
+
+3. **Conflict Detection**:
+   - **RLS denials** are caught in `uploadData()` error handler (see Section 5, Step 2)
+   - **Lock conflicts** are enforced by `is_locked` field checks in Supabase RLS policies
+   - **Concurrent edits** are implicitly resolved by Postgres write semantics (last write wins)
+
+4. **User Notification**:
+   - For RLS denials: App should emit a conflict event to UI layer (see `uploadData()` TODO comment)
+   - For lock conflicts: App checks `is_locked` field before showing edit UI
+   - For stale data: Consider adding UI warnings if `updated_at` field is older than a threshold
+
+**Best Practices:**
+
+- **Use `updated_at` timestamps**: Always include `updated_at` fields and update them on every write
+- **Check locks before editing**: Query `is_locked` status before allowing edits to cost estimates
+- **Surface conflicts to users**: Don't silently fail - show clear messages when writes are rejected
+- **Consider optimistic locking**: For critical updates, add `updated_at` version checks in RLS policies to detect stale writes
+
+**What PowerSync Does NOT Handle:**
+
+- Automatic three-way merge of concurrent field-level changes
+- Custom conflict resolution logic (e.g., user-selectable "keep mine" vs "keep theirs")
+- Conflict-free replicated data types (CRDTs)
+
+For these advanced cases, implement custom conflict resolution in your Supabase Edge Functions or trigger logic.
 
 ---
 
@@ -190,6 +309,10 @@ streams:
         WHERE u.credential_id = auth.user_id()
           AND pm.membership_status = 'joined'
           AND p.project_status != 'archived'
+      # CTE name intentionally matches the logical concept (project estimates)
+      # while reading from the physical table (cost_estimates).
+      # In queries below, "FROM project_estimates" reads from this CTE,
+      # not directly from the database table.
       project_estimates: |
         SELECT * FROM cost_estimates
         WHERE project_id = subscription.parameter('project_id')
@@ -210,6 +333,8 @@ streams:
           SELECT id FROM project_estimates
         )
 ```
+
+> **Note on CTE naming:** The `project_estimates` CTE is named to represent the logical concept (project-scoped estimates) rather than mirroring the database table name (`cost_estimates`). In the `queries:` block that follows, `FROM project_estimates` reads from this CTE — not directly from the `cost_estimates` table. This is intentional: the CTE is where the authorization filter (`accessible_projects`) and parameter scoping (`project_id`) are applied.
 
 ### Key Design Decisions
 
@@ -245,7 +370,10 @@ The schema tells PowerSync what tables and columns to materialize in the local S
 const schema = Schema([
   Table('projects', [
     Column.text('project_name'),
+    Column.text('description'),
+    Column.text('creator_user_id'),
     Column.text('project_status'),
+    Column.text('created_at'),
     Column.text('updated_at'),
   ]),
   Table('cost_estimates', [
@@ -282,8 +410,9 @@ class SupabaseConnector extends PowerSyncBackendConnector {
   Future<PowerSyncCredentials?> fetchCredentials() async {
     final session = supabase.auth.currentSession;
     if (session == null) return null;
+    final powerSyncUrl = appBootstrap.envLoader.get('POWERSYNC_URL')??'';
     return PowerSyncCredentials(
-      endpoint: Env.powerSyncUrl,
+      endpoint: powerSyncURL,
       token: session.accessToken,
     );
   }
@@ -305,7 +434,18 @@ class SupabaseConnector extends PowerSyncBackendConnector {
       }
       await tx.complete();
     } catch (e) {
-      // PowerSync retries automatically on failure
+      // Differentiate between permanent and transient failures
+      if (e is PostgrestException && e.code == '42501') {
+        // RLS denial (42501) — permanent failure, do not retry.
+        // Mark the transaction complete so the queue can advance.
+        // The local optimistic change persists; surface a conflict
+        // message to the user via a separate error state.
+        await tx.complete();
+        // TODO: emit conflict event to UI layer
+        return;
+      }
+      // Transient failure (network timeout, server error, etc.) —
+      // rethrow so PowerSync retries automatically
       rethrow;
     }
   }
@@ -374,6 +514,19 @@ final estimates = await db.getAll(
 // When user navigates away
 sub.unsubscribe();
 ```
+
+**What happens after the 24-hour TTL expires?**
+
+After 24 hours of inactivity (no active subscription to a stream with specific parameters):
+
+1. **Data is removed from local storage** — PowerSync deletes the cached data for that subscription to free up space
+2. **On next access** — When the user reopens the same project, PowerSync re-fetches the data from the server (requires network)
+3. **TTL resets** — The 24-hour timer restarts each time the stream is actively subscribed
+
+**Important:**
+- The TTL only applies to **on-demand streams** (like `project_cost_data`), not `auto_subscribe` streams (like `user_projects`)
+- Auto-subscribed streams remain cached indefinitely as long as the user is authenticated
+- You can configure custom TTL values in the stream definition if 24 hours doesn't fit your use case
 
 ---
 
@@ -805,9 +958,102 @@ If issues arise, revert `sync-config.yaml` to the database query approach and re
 - [ ] Performance verified: faster sync, lower DB load
 - [ ] Rollback plan documented and tested in staging
 
+### PowerSync vs Pure Supabase Toggle
+
+**Q: Can we have a switch to control whether to use PowerSync or Pure Supabase?**
+
+Yes, but it requires careful architectural planning. Here are the implementation approaches:
+
+#### Approach 1: Feature Flag with Separate Data Access Layer (Recommended)
+
+Create an abstraction layer that switches between PowerSync and Supabase client:
+
+```dart
+abstract class DataRepository {
+  Future<List<Project>> getProjects();
+  Future<void> updateProject(String id, Map<String, dynamic> data);
+  Stream<List<Project>> watchProjects();
+}
+
+class PowerSyncRepository implements DataRepository {
+  final PowerSyncDatabase db;
+
+  @override
+  Future<List<Project>> getProjects() async {
+    return await db.getAll('SELECT * FROM projects');
+  }
+
+  @override
+  Stream<List<Project>> watchProjects() {
+    return db.watch('SELECT * FROM projects');
+  }
+}
+
+class SupabaseRepository implements DataRepository {
+  final SupabaseClient client;
+
+  @override
+  Future<List<Project>> getProjects() async {
+    return await client.from('projects').select();
+  }
+
+  @override
+  Stream<List<Project>> watchProjects() {
+    return client.from('projects').stream(primaryKey: ['id']);
+  }
+}
+
+// In your app initialization
+final bool usePowerSync = FeatureFlags.offlineMode; // from remote config
+final DataRepository repo = usePowerSync
+    ? PowerSyncRepository(powerSyncDb)
+    : SupabaseRepository(supabase);
+```
+
+**Pros:**
+- Clean separation of concerns
+- Easy to test both modes
+- Can enable PowerSync per-user via feature flags
+- Allows gradual rollout
+
+**Cons:**
+- Requires maintaining two code paths
+- Some PowerSync features (offline queuing, conflict resolution) don't apply to pure Supabase mode
+- Schema changes must be tested in both modes
+
+#### Approach 2: PowerSync-Only with Disabled Sync (Not Recommended)
+
+Technically, you could use PowerSync in "direct mode" (queries go straight to Supabase), but this defeats the purpose of PowerSync and adds unnecessary complexity.
+
+#### Recommended Strategy for Construculator
+
+1. **Default to PowerSync for production** — construction sites need offline-first capabilities
+2. **Use feature flags for testing** — enable pure Supabase mode for QA environments or specific test users
+3. **Abstract data access early** — implement the repository pattern from the start to avoid tight coupling
+4. **Monitor performance** — use analytics to compare sync performance vs direct Supabase queries
+
+**When to use each mode:**
+
+| Use Case | Mode | Reason |
+|---|---|---|
+| Production mobile app | PowerSync | Offline-first, handles poor connectivity |
+| Admin web dashboard | Pure Supabase | Always online, simpler implementation |
+| Automated testing | Pure Supabase | Faster, no sync delays |
+| Development | Toggle via feature flag | Test both paths |
+
+**Implementation Checklist:**
+
+- [ ] Define `DataRepository` interface covering all data operations
+- [ ] Implement `PowerSyncRepository` using PowerSync SDK
+- [ ] Implement `SupabaseRepository` using Supabase client
+- [ ] Add feature flag (e.g., `USE_OFFLINE_SYNC`) to remote config
+- [ ] Initialize appropriate repository based on flag
+- [ ] Test both code paths in CI/CD pipeline
+- [ ] Document which features are PowerSync-only (offline queue, conflict UI)
+
 ---
 
-## 10. Common Pitfalls
+## 11. Common Pitfalls
 
 ### No data syncing to client
 
@@ -818,8 +1064,8 @@ If issues arise, revert `sync-config.yaml` to the database query approach and re
 ### JWKS endpoint returns empty keys
 
 - Run `npx supabase gen signing-key`.
-- Save the generated key to supabase/signing_key.json
-- Update supabase/config.toml with the new keys path
+- Save the generated key to `supabase/signing_keys.json`
+- Update `supabase/config.toml` with the new keys path
 - Restart Supabase services after generating keys.
 - Run `curl <PS_BACKEND_JWKS_URI>` and confirm the `keys` array is non-empty.
 
