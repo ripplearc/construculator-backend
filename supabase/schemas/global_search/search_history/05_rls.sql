@@ -31,7 +31,8 @@ CREATE POLICY "search_history_delete_policy" ON "public"."search_history"
 CREATE POLICY "search_history_teammate_select_policy" ON "public"."search_history"
   FOR SELECT
   USING (
-    project_id IN (
+    project_id IS NOT NULL
+    AND project_id IN (
       SELECT pm.project_id
       FROM project_members pm
       JOIN users u ON pm.user_id = u.id

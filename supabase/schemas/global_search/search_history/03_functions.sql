@@ -45,6 +45,8 @@ $$ LANGUAGE plpgsql;
 -- Note: filter_by_tag is accepted to keep the API contract stable but
 -- is currently a no-op. No project-tag join table exists yet; tag
 -- filtering will be wired up once that schema is in place.
+-- TODO: [CA-596] Wire up filter_by_tag once project-tag schema exists.
+-- https://ripplearc.youtrack.cloud/issue/CA-596
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.global_search(
   query text,
@@ -67,6 +69,13 @@ DECLARE
   v_search      text  := '%' || lower(query) || '%';
 BEGIN
 
+  -- Validate scope — unknown values would silently return empty results.
+  IF scope IS NOT NULL AND scope NOT IN ('dashboard', 'estimation', 'member') THEN
+    RAISE EXCEPTION 'Invalid scope: %', scope USING ERRCODE = '22023';
+  END IF;
+
+  -- TODO: [CA-596] Wire up filter_by_tag once project-tag schema exists.
+  -- https://ripplearc.youtrack.cloud/issue/CA-596
   -- filter_by_tag is reserved for future use. No project-tag join table
   -- exists yet; the parameter is accepted but not applied to any query.
 
@@ -139,7 +148,6 @@ BEGIN
     FROM (
       SELECT DISTINCT ON (u.id)
         u.id,
-        u.credential_id,
         u.first_name,
         u.last_name,
         u.professional_role,

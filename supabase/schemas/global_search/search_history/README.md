@@ -43,6 +43,8 @@ Project members can read each other's `search_history` rows for shared projects 
 
 `user_id` has no foreign key to `auth.users` (cross-schema boundary). Rows are not cascade-deleted when a user is removed. A periodic cleanup job should purge rows where `user_id` no longer exists in `auth.users`.
 
+> **TODO ([CA-597](https://ripplearc.youtrack.cloud/issue/CA-597)):** Implement periodic cleanup job to purge `search_history` rows where `user_id` no longer exists in `auth.users`.
+
 ---
 
 ## Indexes
@@ -102,6 +104,8 @@ Full-text search across projects, cost estimates, and members. Returns a JSON ob
 | `limit` | `int` | Pagination limit (default 20). Up to `3 × limit` rows may be returned (one set per entity). |
 
 **Performance note:** all text matching uses leading-wildcard `LIKE`, which causes sequential scans at scale. A follow-up story should add `pg_trgm` GIN indexes or full-text search.
+
+> **TODO ([CA-598](https://ripplearc.youtrack.cloud/issue/CA-598)):** Add `pg_trgm` GIN indexes or full-text search to replace leading-wildcard `LIKE`.
 
 ---
 
