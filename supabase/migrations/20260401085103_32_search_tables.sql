@@ -100,7 +100,7 @@ END;
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.global_search(query text, filter_by_tag text DEFAULT NULL::text, filter_by_date timestamp with time zone DEFAULT NULL::timestamp with time zone, filter_by_owner uuid DEFAULT NULL::uuid, scope text DEFAULT NULL::text, "offset" integer DEFAULT 0, "limit" integer DEFAULT 20)
+CREATE OR REPLACE FUNCTION public.global_search(query text, filter_by_tag text DEFAULT NULL::text, filter_by_date timestamp with time zone DEFAULT NULL::timestamp with time zone, filter_by_owner uuid DEFAULT NULL::uuid, scope text DEFAULT NULL::text, projects_offset integer DEFAULT 0, estimations_offset integer DEFAULT 0, members_offset integer DEFAULT 0, "limit" integer DEFAULT 20)
  RETURNS jsonb
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -144,7 +144,7 @@ BEGIN
         AND (filter_by_date IS NULL OR created_at >= filter_by_date)
         AND (filter_by_owner IS NULL OR creator_user_id = filter_by_owner)
       ORDER BY updated_at DESC
-      LIMIT "limit" OFFSET "offset"
+      LIMIT "limit" OFFSET projects_offset
     ) p;
   END IF;
 
@@ -180,7 +180,7 @@ BEGIN
         AND (filter_by_date IS NULL OR created_at >= filter_by_date)
         AND (filter_by_owner IS NULL OR creator_user_id = filter_by_owner)
       ORDER BY updated_at DESC
-      LIMIT "limit" OFFSET "offset"
+      LIMIT "limit" OFFSET estimations_offset
     ) e;
   END IF;
 
@@ -205,7 +205,7 @@ BEGIN
           OR lower(u.email) LIKE v_search
         )
       ORDER BY u.id, pm.project_id
-      LIMIT "limit" OFFSET "offset"
+      LIMIT "limit" OFFSET members_offset
     ) m;
   END IF;
 

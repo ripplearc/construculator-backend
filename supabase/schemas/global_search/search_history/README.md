@@ -100,8 +100,10 @@ Full-text search across projects, cost estimates, and members. Returns a JSON ob
 | `filter_by_date` | `timestamptz` | Optional date filter (results on or after this date). |
 | `filter_by_owner` | `uuid` | Optional filter by creator user ID. |
 | `scope` | `text` | Limits results to a specific entity type. `NULL` returns all. |
-| `offset` | `int` | Pagination offset (default 0). |
-| `limit` | `int` | Pagination limit (default 20). Up to `3 × limit` rows may be returned (one set per entity). |
+| `projects_offset` | `int` | Pagination offset for the projects result set (default 0). |
+| `estimations_offset` | `int` | Pagination offset for the estimations result set (default 0). |
+| `members_offset` | `int` | Pagination offset for the members result set (default 0). |
+| `limit` | `int` | Pagination limit applied to each entity independently (default 20). Up to `3 × limit` rows may be returned in total. |
 
 **Performance note:** all text matching uses leading-wildcard `LIKE`, which causes sequential scans at scale. A follow-up story should add `pg_trgm` GIN indexes or full-text search.
 
@@ -125,10 +127,7 @@ Returns up to 10 personalised search term suggestions using a 3-step priority:
 
 | File | Content |
 |---|---|
-| `20260324000001_32_search_tables.sql` | Table definition, indexes. |
-| `20260324000002_RLS_08_search_tables_rules.sql` | RLS enable + 5 policies. |
-| `20260324000003_global_search_rpc.sql` | `global_search` and `get_search_suggestions` RPCs. |
-| `20260324000004_search_history_increment_trigger.sql` | `trigger_increment_search_count` and `trigger_set_search_history_updated_at`. |
+| `20260401085103_32_search_tables.sql` | Consolidated diff-generated migration. Covers: `search_history` table, indexes, RLS enable + 5 policies, `global_search` and `get_search_suggestions` RPCs, `trigger_increment_search_count` and `trigger_set_search_history_updated_at` triggers. |
 
 ---
 

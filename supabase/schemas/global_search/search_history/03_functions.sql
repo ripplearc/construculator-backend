@@ -31,9 +31,14 @@ $$ LANGUAGE plpgsql;
 -- global_search RPC
 --
 -- Parameters: query, filter_by_tag, filter_by_date,
--- filter_by_owner, scope, offset, limit.
+-- filter_by_owner, scope, projects_offset, estimations_offset,
+-- members_offset, limit.
 --
 -- Returns jsonb: { projects: [...], estimations: [...], members: [...] }
+--
+-- Each entity has its own independent offset so clients can paginate
+-- through projects, estimations, and members separately.
+-- Up to 3 × limit rows may be returned in total.
 --
 -- SECURITY INVOKER: existing RLS on projects, cost_estimates and
 -- project_members is automatically enforced — no manual permission
@@ -54,7 +59,9 @@ CREATE OR REPLACE FUNCTION public.global_search(
   filter_by_date timestamptz DEFAULT NULL,
   filter_by_owner uuid DEFAULT NULL,
   scope text DEFAULT NULL,
-  "offset" int DEFAULT 0,
+  projects_offset int DEFAULT 0,
+  estimations_offset int DEFAULT 0,
+  members_offset int DEFAULT 0,
   "limit" int DEFAULT 20
 )
 RETURNS jsonb
@@ -101,7 +108,7 @@ BEGIN
         AND (filter_by_date IS NULL OR created_at >= filter_by_date)
         AND (filter_by_owner IS NULL OR creator_user_id = filter_by_owner)
       ORDER BY updated_at DESC
-      LIMIT "limit" OFFSET "offset"
+      LIMIT "limit" OFFSET projects_offset
     ) p;
   END IF;
 
@@ -137,7 +144,7 @@ BEGIN
         AND (filter_by_date IS NULL OR created_at >= filter_by_date)
         AND (filter_by_owner IS NULL OR creator_user_id = filter_by_owner)
       ORDER BY updated_at DESC
-      LIMIT "limit" OFFSET "offset"
+      LIMIT "limit" OFFSET estimations_offset
     ) e;
   END IF;
 
@@ -162,7 +169,7 @@ BEGIN
           OR lower(u.email) LIKE v_search
         )
       ORDER BY u.id, pm.project_id
-      LIMIT "limit" OFFSET "offset"
+      LIMIT "limit" OFFSET members_offset
     ) m;
   END IF;
 
@@ -179,7 +186,10 @@ COMMENT ON FUNCTION public.global_search IS
 'Global search RPC. Returns projects, cost estimates, and members matching the query.
 Respects RLS — users only see records they have permission to access.
 project_status is aliased as "status" to match the expected API contract.
-filter_by_tag is accepted but currently a no-op (no project-tag schema yet).';
+filter_by_tag is accepted but currently a no-op (no project-tag schema yet).
+Each entity type has its own independent offset parameter (projects_offset,
+estimations_offset, members_offset) so clients can paginate through each
+entity list separately. Up to 3 × limit rows may be returned in total.';
 
 -- ============================================================
 -- get_search_suggestions RPC
