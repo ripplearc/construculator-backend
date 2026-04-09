@@ -147,3 +147,150 @@ $$;
 
 
 ALTER FUNCTION "public"."handle_soft_delete_cost_estimates"() OWNER TO "postgres";
+
+
+-- Log Cost Estimate Creation
+-- Triggered after INSERT on cost_estimates
+
+CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_created"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+  PERFORM log_cost_estimate_activity(
+    NEW.id,
+    'cost_estimation_created',
+    'Cost estimate created: ' || NEW.estimate_name,
+    NEW.creator_user_id,
+    jsonb_build_object(
+      'name', NEW.estimate_name,
+      'description', COALESCE(NEW.estimate_description, '')
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."log_cost_estimate_created"() OWNER TO "postgres";
+
+
+-- Log Cost Estimate Updates (Renamed, Locked, Unlocked)
+-- Triggered after UPDATE on cost_estimates when name or lock status changes
+
+CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_updated"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_auth_uid text;
+BEGIN
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
+
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
+  IF v_user_id IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
+  END IF;
+
+  -- Log name change (Renamed)
+  IF OLD.estimate_name IS DISTINCT FROM NEW.estimate_name THEN
+    PERFORM log_cost_estimate_activity(
+      NEW.id,
+      'cost_estimation_renamed',
+      'Cost estimate renamed from "' || OLD.estimate_name || '" to "' || NEW.estimate_name || '"',
+      v_user_id,
+      jsonb_build_object(
+        'oldName', OLD.estimate_name,
+        'newName', NEW.estimate_name
+      )
+    );
+  END IF;
+
+  -- Log lock status change
+  IF OLD.is_locked IS DISTINCT FROM NEW.is_locked THEN
+    IF NEW.is_locked THEN
+      PERFORM log_cost_estimate_activity(
+        NEW.id,
+        'cost_estimation_locked',
+        'Cost estimate locked',
+        COALESCE(NEW.locked_by_user_id, v_user_id),
+        '{}'::jsonb
+      );
+    ELSE
+      PERFORM log_cost_estimate_activity(
+        NEW.id,
+        'cost_estimation_unlocked',
+        'Cost estimate unlocked',
+        v_user_id,
+        '{}'::jsonb
+      );
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."log_cost_estimate_updated"() OWNER TO "postgres";
+
+
+-- Log Cost Estimate Deletion
+-- Triggered after soft delete (UPDATE with deleted_at set)
+
+CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_deleted"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_auth_uid text;
+BEGIN
+  -- Get credential_id from JWT claims
+  BEGIN
+    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+  EXCEPTION WHEN OTHERS THEN
+    v_auth_uid := NULL;
+  END;
+
+  -- Skip logging if no authenticated user (service role or migration context)
+  IF v_auth_uid IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
+    RETURN NEW;
+  END IF;
+
+  -- Look up user_id from credential_id
+  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
+
+  -- Skip if user not found
+  IF v_user_id IS NULL THEN
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RETURN NEW;
+  END IF;
+
+  PERFORM log_cost_estimate_activity(
+    NEW.id,
+    'cost_estimation_deleted',
+    'Cost estimate deleted: ' || NEW.estimate_name,
+    v_user_id,
+    '{}'::jsonb
+  );
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION "public"."log_cost_estimate_deleted"() OWNER TO "postgres";
