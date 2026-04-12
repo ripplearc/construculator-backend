@@ -3,6 +3,7 @@
 
 -- Update Permission Guard
 -- Enforces column-level permissions and immutability rules for updates
+-- Migrated to JWT-based authorization for improved performance
 
 CREATE OR REPLACE FUNCTION "public"."check_cost_estimate_update_permissions"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -62,22 +63,22 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
+  -- Use JWT claims instead of database lookup
   IF delete_changed THEN
-    IF NOT "user_has_project_permission"(
+    IF NOT jwt_has_project_permission(
       NEW.project_id,
-      'delete_cost_estimation',
-      auth.uid()
+      'delete_cost_estimation'
     ) THEN
       RAISE EXCEPTION 'Insufficient permissions: delete_cost_estimation required to mark as deleted'
       USING ERRCODE = '42501';
     END IF;
   END IF;
 
+  -- Use JWT claims instead of database lookup
   IF lock_changed THEN
-    IF NOT "user_has_project_permission"(
+    IF NOT jwt_has_project_permission(
       NEW.project_id,
-      'lock_cost_estimation',
-      auth.uid()
+      'lock_cost_estimation'
     ) THEN
       RAISE EXCEPTION 'Insufficient permissions: lock_cost_estimation required to modify lock columns'
         USING ERRCODE = '42501';
@@ -85,7 +86,7 @@ BEGIN
 
 
     IF NEW.is_locked THEN
-      NEW.locked_by_user_id := (SELECT id FROM users WHERE credential_id = auth.uid());
+      NEW.locked_by_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
       NEW.locked_at := now();
     ELSE
       NEW.locked_by_user_id := NULL;

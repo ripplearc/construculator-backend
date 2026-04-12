@@ -90,7 +90,7 @@ All operations require specific project permissions:
 | UPDATE (lock) | `lock_cost_estimation` |
 | DELETE | `delete_cost_estimation` |
 
-Permissions are checked via `user_has_project_permission()` function.
+Permissions are checked via the `jwt_has_project_permission()` function, which reads permissions directly from JWT claims for improved performance (instead of querying the database).
 
 ## Functions
 
@@ -99,11 +99,13 @@ Permissions are checked via `user_has_project_permission()` function.
 
 **Responsibilities**:
 1. Enforce immutable column restrictions
-2. Check `delete_cost_estimation` permission for soft deletes
-3. Check `lock_cost_estimation` permission for lock changes
-4. Auto-populate `locked_by_user_id` and `locked_at` when locking
+2. Check `delete_cost_estimation` permission for soft deletes (via JWT claims)
+3. Check `lock_cost_estimation` permission for lock changes (via JWT claims)
+4. Auto-populate `locked_by_user_id` and `locked_at` when locking (user ID resolved from JWT `sub` claim)
 5. Auto-clear lock fields when unlocking
 6. Update `updated_at` timestamp
+
+**Note**: Uses `jwt_has_project_permission()` for permission checks and resolves user ID from `auth.jwt()->>'sub'` instead of `auth.uid()` for improved performance.
 
 ### `handle_soft_delete_cost_estimates()`
 **Trigger function** that runs before DELETE operations.
@@ -183,11 +185,15 @@ Performance indexes for common queries:
 
 ## RLS Policies
 
+Row Level Security policies use JWT-based authorization for improved performance by reading permissions directly from JWT tokens instead of querying the database.
+
 ### Permissive Policies (any can grant access)
-1. **cost_estimates_select_policy** - View if has `get_cost_estimations`
-2. **cost_estimates_insert_policy** - Create if has `add_cost_estimation`
-3. **cost_estimates_update_policy** - Edit if has `edit_cost_estimation`
-4. **cost_estimates_delete_policy** - Delete if has `delete_cost_estimation`
+1. **cost_estimates_select_policy** - View if has `get_cost_estimations` permission in JWT
+2. **cost_estimates_insert_policy** - Create if has `add_cost_estimation` permission in JWT
+3. **cost_estimates_update_policy** - Edit if has `edit_cost_estimation` permission in JWT
+4. **cost_estimates_delete_policy** - Delete if has `delete_cost_estimation` permission in JWT
+
+All permissive policies use `jwt_has_project_permission(project_id, '<permission>')` and target `authenticated` users.
 
 ### Restrictive Policy (must pass for all operations)
 5. **exclude_soft_deleted_estimates** - Hides rows where `deleted_at IS NOT NULL`
