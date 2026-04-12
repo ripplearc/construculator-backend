@@ -8,8 +8,14 @@ AS $$
 DECLARE
   claims jsonb;
   projects_claims jsonb;
+  user_internal_id uuid;
 BEGIN
   claims := event->'claims';
+
+  -- Get the internal user ID (users.id) from credential_id
+  SELECT u.id INTO user_internal_id
+  FROM public.users u
+  WHERE u.credential_id = (event->>'user_id')::uuid;
 
   SELECT COALESCE(
     jsonb_object_agg(project_permissions.project_id, project_permissions.permissions),
@@ -29,12 +35,15 @@ BEGIN
     GROUP BY pm.project_id
   ) AS project_permissions;
 
-  -- Ensure app_metadata exists, then merge in projects
+  -- Ensure app_metadata exists, then merge in projects and internal_user_id
   -- This handles cases where claims don't yet have app_metadata (e.g., first login)
   claims := jsonb_set(
     claims,
     '{app_metadata}',
-    COALESCE(claims->'app_metadata', '{}'::jsonb) || jsonb_build_object('projects', projects_claims),
+    COALESCE(claims->'app_metadata', '{}'::jsonb) || jsonb_build_object(
+      'projects', projects_claims,
+      'internal_user_id', user_internal_id
+    ),
     true
   );
 

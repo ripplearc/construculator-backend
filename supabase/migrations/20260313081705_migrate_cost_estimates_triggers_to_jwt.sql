@@ -82,7 +82,7 @@ BEGIN
 
 
     IF NEW.is_locked THEN
-      NEW.locked_by_user_id := (SELECT id FROM users WHERE credential_id = (auth.jwt()->>'sub')::uuid);
+      NEW.locked_by_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
       NEW.locked_at := now();
     ELSE
       NEW.locked_by_user_id := NULL;

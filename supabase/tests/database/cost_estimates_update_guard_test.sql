@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(11);
 
 DO $$
 DECLARE
@@ -55,6 +55,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{
   "sub": "22222222-2222-2222-2222-222222222222",
   "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
     "projects": {
       "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
     }
@@ -77,6 +78,7 @@ SELECT throws_ok(
 SELECT set_config('request.jwt.claims', '{
   "sub": "99999999-9999-9999-9999-999999999999",
   "app_metadata": {
+    "internal_user_id": "88888888-8888-8888-8888-888888888888",
     "projects": {
       "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
     }
@@ -96,6 +98,7 @@ SELECT throws_ok(
 SELECT set_config('request.jwt.claims', '{
   "sub": "22222222-2222-2222-2222-222222222222",
   "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
     "projects": {
       "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
     }
@@ -133,6 +136,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{
   "sub": "22222222-2222-2222-2222-222222222222",
   "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
     "projects": {
       "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
     }
@@ -161,6 +165,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{
   "sub": "99999999-9999-9999-9999-999999999999",
   "app_metadata": {
+    "internal_user_id": "88888888-8888-8888-8888-888888888888",
     "projects": {
       "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
     }
@@ -190,6 +195,7 @@ SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{
   "sub": "dddddddd-dddd-dddd-dddd-dddddddddddd",
   "app_metadata": {
+    "internal_user_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
     "projects": {
       "33333333-3333-3333-3333-333333333333": ["get_cost_estimations"]
     }
@@ -205,6 +211,29 @@ SELECT is(
   'Renamed Estimate',
   'RLS blocks viewer without edit_cost_estimation from updating'
 );
+
+-- =============================================================
+-- Test 11: Collaborator with edit but not delete permission cannot soft-delete
+-- =============================================================
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{
+  "sub": "99999999-9999-9999-9999-999999999999",
+  "app_metadata": {
+    "internal_user_id": "88888888-8888-8888-8888-888888888888",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
+
+SELECT throws_ok(
+  $$ UPDATE cost_estimates SET deleted_at = now() WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
+  '42501',
+  'Insufficient permissions: delete_cost_estimation required to mark as deleted',
+  'Collaborator without delete_cost_estimation cannot soft-delete'
+);
+
+RESET ROLE;
 
 select * from finish();
 rollback;

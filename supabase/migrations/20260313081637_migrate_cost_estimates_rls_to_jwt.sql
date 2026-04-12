@@ -34,6 +34,9 @@ CREATE POLICY "cost_estimates_update_policy" ON "cost_estimates"
   TO authenticated
   USING (
     jwt_has_project_permission(project_id, 'edit_cost_estimation')
+  )
+  WITH CHECK (
+    jwt_has_project_permission(project_id, 'edit_cost_estimation')
   );
 
 -- Policy for DELETE operations (removing cost estimates)
