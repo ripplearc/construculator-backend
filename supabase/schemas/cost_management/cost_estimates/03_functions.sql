@@ -63,7 +63,6 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Use JWT claims instead of database lookup
   IF delete_changed THEN
     IF NOT jwt_has_project_permission(
       NEW.project_id,
@@ -74,7 +73,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- Use JWT claims instead of database lookup
   IF lock_changed THEN
     IF NOT jwt_has_project_permission(
       NEW.project_id,
@@ -184,27 +182,17 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_updated"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
-  v_auth_uid text;
 BEGIN
-  -- Get credential_id from JWT claims
+  -- Get internal_user_id from JWT app_metadata (migrated from database lookup)
   BEGIN
-    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+    v_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
   EXCEPTION WHEN OTHERS THEN
-    v_auth_uid := NULL;
+    v_user_id := NULL;
   END;
 
   -- Skip logging if no authenticated user (service role or migration context)
-  IF v_auth_uid IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
-    RETURN NEW;
-  END IF;
-
-  -- Look up user_id from credential_id
-  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
-
-  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
     RETURN NEW;
   END IF;
 
@@ -259,27 +247,17 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_deleted"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
-  v_auth_uid text;
 BEGIN
-  -- Get credential_id from JWT claims
+  -- Get internal_user_id from JWT app_metadata (migrated from database lookup)
   BEGIN
-    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+    v_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
   EXCEPTION WHEN OTHERS THEN
-    v_auth_uid := NULL;
+    v_user_id := NULL;
   END;
 
   -- Skip logging if no authenticated user (service role or migration context)
-  IF v_auth_uid IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
-    RETURN NEW;
-  END IF;
-
-  -- Look up user_id from credential_id
-  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
-
-  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
     RETURN NEW;
   END IF;
 

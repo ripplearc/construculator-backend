@@ -101,11 +101,11 @@ Permissions are checked via the `jwt_has_project_permission()` function, which r
 1. Enforce immutable column restrictions
 2. Check `delete_cost_estimation` permission for soft deletes (via JWT claims)
 3. Check `lock_cost_estimation` permission for lock changes (via JWT claims)
-4. Auto-populate `locked_by_user_id` and `locked_at` when locking (user ID resolved from JWT `sub` claim)
+4. Auto-populate `locked_by_user_id` and `locked_at` when locking (user ID resolved from JWT `app_metadata.internal_user_id`)
 5. Auto-clear lock fields when unlocking
 6. Update `updated_at` timestamp
 
-**Note**: Uses `jwt_has_project_permission()` for permission checks and resolves user ID from `auth.jwt()->>'sub'` instead of `auth.uid()` for improved performance.
+**Note**: Uses `jwt_has_project_permission()` for permission checks and resolves user ID from `auth.jwt()->'app_metadata'->>'internal_user_id'` for improved performance.
 
 ### `handle_soft_delete_cost_estimates()`
 **Trigger function** that runs before DELETE operations.
