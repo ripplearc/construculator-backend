@@ -1,5 +1,5 @@
 begin;
-select plan(10);
+select plan(11);
 
 DO $$
 DECLARE
@@ -52,7 +52,15 @@ BEGIN
 END $$;
 
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
+    }
+  }
+}', true);
 
 -- =============================================================
 -- Test 1: Immutable guard blocks creator_user_id change
@@ -67,7 +75,15 @@ SELECT throws_ok(
 -- =============================================================
 -- Test 2: Collaborator (no lock permission) cannot lock estimate
 -- =============================================================
-SELECT set_config('request.jwt.claims', '{"sub":"99999999-9999-9999-9999-999999999999"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "99999999-9999-9999-9999-999999999999",
+  "app_metadata": {
+    "internal_user_id": "88888888-8888-8888-8888-888888888888",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT throws_ok(
   $$ UPDATE cost_estimates SET is_locked = true WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -79,7 +95,15 @@ SELECT throws_ok(
 -- =============================================================
 -- Test 3: Admin can lock by setting is_locked = true
 -- =============================================================
-SELECT set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT lives_ok(
   $$ UPDATE cost_estimates SET is_locked = true WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -109,7 +133,15 @@ SELECT isnt_empty(
 -- Test 6: Admin can unlock by setting is_locked = false
 -- =============================================================
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation", "lock_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT lives_ok(
   $$ UPDATE cost_estimates SET is_locked = false WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -130,7 +162,15 @@ SELECT is_empty(
 -- Test 8: Collaborator can update estimate_name (allowed column)
 -- =============================================================
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"99999999-9999-9999-9999-999999999999"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "99999999-9999-9999-9999-999999999999",
+  "app_metadata": {
+    "internal_user_id": "88888888-8888-8888-8888-888888888888",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
 
 SELECT lives_ok(
   $$ UPDATE cost_estimates SET estimate_name = 'Renamed Estimate' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
@@ -152,7 +192,15 @@ SELECT is(
 -- Test 10: Viewer without edit_cost_estimation blocked by RLS
 -- =============================================================
 SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims', '{"sub":"dddddddd-dddd-dddd-dddd-dddddddddddd"}', true);
+SELECT set_config('request.jwt.claims', '{
+  "sub": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+  "app_metadata": {
+    "internal_user_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations"]
+    }
+  }
+}', true);
 
 UPDATE cost_estimates SET estimate_name = 'Should Not Change' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -163,6 +211,29 @@ SELECT is(
   'Renamed Estimate',
   'RLS blocks viewer without edit_cost_estimation from updating'
 );
+
+-- =============================================================
+-- Test 11: Collaborator with edit but not delete permission cannot soft-delete
+-- =============================================================
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{
+  "sub": "99999999-9999-9999-9999-999999999999",
+  "app_metadata": {
+    "internal_user_id": "88888888-8888-8888-8888-888888888888",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
+
+SELECT throws_ok(
+  $$ UPDATE cost_estimates SET deleted_at = now() WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' $$,
+  '42501',
+  'Insufficient permissions: delete_cost_estimation required to mark as deleted',
+  'Collaborator without delete_cost_estimation cannot soft-delete'
+);
+
+RESET ROLE;
 
 select * from finish();
 rollback;

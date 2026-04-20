@@ -55,7 +55,7 @@ SELECT matches(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   UPDATE cost_estimates SET estimate_name = 'Renamed Estimate' WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 END $$;
 
@@ -94,7 +94,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   UPDATE cost_estimates SET is_locked = true WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 END $$;
 
@@ -116,7 +116,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   UPDATE cost_estimates SET is_locked = false WHERE id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 END $$;
 
@@ -137,7 +137,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   INSERT INTO cost_files (
     id, project_id, filename, content_type, file_size_bytes, uploaded_by_user_id, file_url, version
   ) VALUES (
@@ -187,7 +187,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   DELETE FROM cost_files WHERE id = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 END $$;
 
@@ -242,7 +242,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   INSERT INTO cost_items (
     id, estimate_id, item_name, item_type, unit_price, quantity, unit_measurement, 
     calculation, item_total_cost, currency
@@ -301,8 +301,8 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
-  UPDATE cost_items 
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
+  UPDATE cost_items
   SET item_name = 'Updated Cost Item', unit_price = 150.00
   WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 END $$;
@@ -372,7 +372,7 @@ SELECT is(
 -- =============================================================
 DO $$
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
   UPDATE cost_items SET deleted_at = now() WHERE id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 END $$;
 
@@ -418,8 +418,8 @@ SELECT is(
 DO $$
 BEGIN
   -- Re-authenticate
-  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222"}', true);
-  
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
+
   -- Insert a fresh item for test 11 to avoid interference from previous tests
   INSERT INTO cost_items (
     id, estimate_id, item_name, item_type, unit_price, quantity, unit_measurement, 

@@ -19,6 +19,7 @@ We will implement a Custom Access Token Hook that injects user permissions direc
 ```json
 {
   "app_metadata": {
+    "internal_user_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "projects": {
       "550e8400-e29b-41d4-a716-446655440000": ["add_cost_estimation", "edit_cost_estimation", "get_cost_estimations"],
       "7c9e6679-7425-40de-944b-e07fc1f90ae7": ["get_cost_estimations", "lock_cost_estimation"]
@@ -27,7 +28,8 @@ We will implement a Custom Access Token Hook that injects user permissions direc
 }
 ```
 
-Each key is a `project_id` (UUID), and the value is an array of permission keys the user has for that project.
+- `internal_user_id`: The internal application user ID (`users.id`), used by triggers to set fields like `locked_by_user_id` without database lookups
+- `projects`: Each key is a `project_id` (UUID), and the value is an array of permission keys the user has for that project
 
 ### Benefits
 
@@ -54,8 +56,14 @@ AS $$
 DECLARE
   claims jsonb;
   projects_claims jsonb;
+  user_internal_id uuid;
 BEGIN
   claims := event->'claims';
+
+  -- Get the internal user ID (users.id) from credential_id
+  SELECT u.id INTO user_internal_id
+  FROM public.users u
+  WHERE u.credential_id = (event->>'user_id')::uuid;
 
   SELECT COALESCE(
     jsonb_object_agg(project_permissions.project_id, project_permissions.permissions),
@@ -75,10 +83,14 @@ BEGIN
     GROUP BY pm.project_id
   ) AS project_permissions;
 
+  -- Ensure app_metadata exists, then merge in projects and internal_user_id
   claims := jsonb_set(
     claims,
-    '{app_metadata,projects}',
-    projects_claims,
+    '{app_metadata}',
+    COALESCE(claims->'app_metadata', '{}'::jsonb) || jsonb_build_object(
+      'projects', projects_claims,
+      'internal_user_id', user_internal_id
+    ),
     true
   );
 

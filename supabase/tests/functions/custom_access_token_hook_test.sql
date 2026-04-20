@@ -226,6 +226,19 @@ BEGIN
       actual_permissions::text;
   END IF;
 
+  -- Verify internal_user_id is present in app_metadata
+  IF NOT (result->'claims'->'app_metadata' ? 'internal_user_id') THEN
+    RAISE EXCEPTION 'app_metadata.internal_user_id should exist. Got: %',
+      (result->'claims'->'app_metadata')::text;
+  END IF;
+
+  -- Verify internal_user_id matches the test user's ID
+  IF (result->'claims'->'app_metadata'->>'internal_user_id')::uuid != test_user_id THEN
+    RAISE EXCEPTION 'internal_user_id should match user ID. Expected: %, Got: %',
+      test_user_id::text,
+      (result->'claims'->'app_metadata'->>'internal_user_id')::text;
+  END IF;
+
 END $$;
 SELECT ok(true, 'Hook correctly injects real user permissions for project memberships');
 
