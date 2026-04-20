@@ -3,6 +3,7 @@
 
 -- Update Permission Guard
 -- Enforces column-level permissions and immutability rules for updates
+-- Migrated to JWT-based authorization for improved performance
 
 CREATE OR REPLACE FUNCTION "public"."check_cost_estimate_update_permissions"() RETURNS "trigger"
     LANGUAGE "plpgsql"
@@ -63,10 +64,9 @@ BEGIN
   END IF;
 
   IF delete_changed THEN
-    IF NOT "user_has_project_permission"(
+    IF NOT jwt_has_project_permission(
       NEW.project_id,
-      'delete_cost_estimation',
-      auth.uid()
+      'delete_cost_estimation'
     ) THEN
       RAISE EXCEPTION 'Insufficient permissions: delete_cost_estimation required to mark as deleted'
       USING ERRCODE = '42501';
@@ -74,10 +74,9 @@ BEGIN
   END IF;
 
   IF lock_changed THEN
-    IF NOT "user_has_project_permission"(
+    IF NOT jwt_has_project_permission(
       NEW.project_id,
-      'lock_cost_estimation',
-      auth.uid()
+      'lock_cost_estimation'
     ) THEN
       RAISE EXCEPTION 'Insufficient permissions: lock_cost_estimation required to modify lock columns'
         USING ERRCODE = '42501';
@@ -85,7 +84,7 @@ BEGIN
 
 
     IF NEW.is_locked THEN
-      NEW.locked_by_user_id := (SELECT id FROM users WHERE credential_id = auth.uid());
+      NEW.locked_by_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
       NEW.locked_at := now();
     ELSE
       NEW.locked_by_user_id := NULL;
@@ -183,27 +182,17 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_updated"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
-  v_auth_uid text;
 BEGIN
-  -- Get credential_id from JWT claims
+  -- Get internal_user_id from JWT app_metadata (migrated from database lookup)
   BEGIN
-    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+    v_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
   EXCEPTION WHEN OTHERS THEN
-    v_auth_uid := NULL;
+    v_user_id := NULL;
   END;
 
   -- Skip logging if no authenticated user (service role or migration context)
-  IF v_auth_uid IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
-    RETURN NEW;
-  END IF;
-
-  -- Look up user_id from credential_id
-  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
-
-  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RAISE NOTICE 'log_cost_estimate_updated: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
     RETURN NEW;
   END IF;
 
@@ -258,27 +247,17 @@ CREATE OR REPLACE FUNCTION "public"."log_cost_estimate_deleted"() RETURNS "trigg
     AS $$
 DECLARE
   v_user_id uuid;
-  v_auth_uid text;
 BEGIN
-  -- Get credential_id from JWT claims
+  -- Get internal_user_id from JWT app_metadata (migrated from database lookup)
   BEGIN
-    v_auth_uid := current_setting('request.jwt.claims', true)::json->>'sub';
+    v_user_id := (auth.jwt()->'app_metadata'->>'internal_user_id')::uuid;
   EXCEPTION WHEN OTHERS THEN
-    v_auth_uid := NULL;
+    v_user_id := NULL;
   END;
 
   -- Skip logging if no authenticated user (service role or migration context)
-  IF v_auth_uid IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', NEW.id;
-    RETURN NEW;
-  END IF;
-
-  -- Look up user_id from credential_id
-  SELECT id INTO v_user_id FROM users WHERE credential_id = v_auth_uid::uuid;
-
-  -- Skip if user not found
   IF v_user_id IS NULL THEN
-    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, user not found for credential %', NEW.id, v_auth_uid;
+    RAISE NOTICE 'log_cost_estimate_deleted: skipped logging for estimate %, no authenticated user (service role or migration context)', old.id;
     RETURN NEW;
   END IF;
 
