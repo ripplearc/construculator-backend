@@ -16,6 +16,7 @@ Database backend for **Construculator** — a construction cost estimation platf
 - [Seeders](#seeders)
 - [Database Testing](#database-testing)
 - [Row Level Security (RLS)](#row-level-security-rls)
+- [PowerSync (Offline Sync)](#powersync-offline-sync)
 - [Local Development Setup](#local-development-setup)
   - [Local Services & Ports](#local-services--ports)
   - [Viewing OTP Codes](#viewing-otp-codes)
@@ -36,6 +37,7 @@ Database backend for **Construculator** — a construction cost estimation platf
 | Auth      | Supabase Auth (JWT, email OTP) |
 | Security  | Row-Level Security (RLS) policies |
 | Testing   | pgTAP (SQL-native database tests) |
+| Offline Sync | PowerSync (self-hosted, MongoDB-backed) |
 | CI        | GitHub Actions |
 
 ---
@@ -100,6 +102,7 @@ construculator-backend/
 │   │   ├── database/            #   pgTAP integration tests
 │   │   └── functions/           #   RPC / edge function tests
 │   └── templates/               # Email templates
+├── powersync/                   # Self-hosted PowerSync service (Docker, sync rules)
 ├── docs/                        # Wiki documentation (auto-synced to GitHub Wiki)
 ├── scripts/                     # Developer utility scripts
 ├── .github/
@@ -377,6 +380,14 @@ GRANT SELECT ON "user_profiles" TO authenticated;
 - Any table with a mix of private and shareable fields.
 - Avoid granting direct `SELECT` on the base table to roles that only need partial data.
 - In schema modules, define views in `05_views.sql` and keep RLS policies in `06_rls.sql`.
+
+---
+
+## PowerSync (Offline Sync)
+
+A self-hosted [PowerSync](https://docs.powersync.com/) service streams Postgres changes to mobile/web clients for offline-first sync. It runs as a separate Docker stack alongside Supabase, replicating from Postgres via logical replication and storing bucket state in MongoDB.
+
+Setup, configuration, sync rules, and troubleshooting live in [powersync/README.md](./powersync/README.md).
 
 ---
 

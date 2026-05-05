@@ -1,0 +1,12 @@
+# Environment variables
+.env
+
+# PowerSync data directory
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+logs/

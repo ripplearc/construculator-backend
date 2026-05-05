@@ -1,0 +1,13 @@
+# PowerSync Sync Streams Configuration - Simple Test
+# Edition 3: https://docs.powersync.com/usage/sync-streams
+
+# Sync streams for edition 3
+config:
+  edition: 3
+
+streams:
+  global:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM professional_roles
+    # TODO: CA-647 Configure Sync Streams for core entities (users, projects, memberships, estimation)
