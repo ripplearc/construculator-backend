@@ -1,0 +1,32 @@
+port: 8080
+
+storage:
+  type: sqlite
+  database: /var/lib/powersync/powersync.db
+
+replication:
+  connections:
+    - id: supabase
+      type: postgresql
+      uri: ${PS_POSTGRESQL_URI}
+      sslmode: disable  # Use 'require' for production
+      slot_name: powersync_slot
+      publication_name: powersync_publication
+      schemas:
+        - public
+
+auth:
+  jwks_uri: ${PS_BACKEND_JWKS_URI}
+
+api:
+  token: ${PS_API_TOKEN}
+
+logging:
+  level: info
+  format: json
+
+telemetry:
+  enabled: false
+
+sync_rules:
+  path: ${PS_SYNC_RULES_FILE}

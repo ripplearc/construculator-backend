@@ -1,0 +1,31 @@
+services:
+  powersync:
+    image: journeyapps/powersync-service:latest
+    container_name: powersync
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./powersync.yaml:/etc/powersync/powersync.yaml:ro
+      - ./sync-config.yaml:/etc/powersync/sync-config.yaml:ro
+    environment:
+      PS_POSTGRESQL_URI: postgresql://postgres:postgres@supabase_db_construculator-backend:5432/postgres
+      PS_PORT: "8080"
+      PS_BACKEND_JWKS_URI: http://supabase_kong_construculator-backend:8000/auth/v1/.well-known/jwks.json
+      PS_API_TOKEN: ${PS_API_TOKEN}
+      PS_CONFIG_FILE: /etc/powersync/powersync.yaml
+      PS_SYNC_RULES_FILE: /etc/powersync/sync-config.yaml
+    networks:
+      - supabase_network_construculator-backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  supabase_network_construculator-backend:
+    external: true
+    name: supabase_network_construculator-backend

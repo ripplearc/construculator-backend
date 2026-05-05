@@ -1,0 +1,15 @@
+# PowerSync Sync Streams Configuration
+# Edition 3: https://docs.powersync.com/usage/sync-streams
+#
+# TODO: Configure sync streams for core entities
+# See: https://ripplearc.youtrack.cloud/issue/CA-647/Configure-Sync-Streams-for-core-entities-users-projects-memberships-estimation
+# Reference implementation: docs/PowerSync.md Section 5
+
+edition: 3
+
+streams:
+  # TODO: Implement streams from docs/PowerSync.md:
+  # - my_user (auto_subscribe)
+  # - user_projects (auto_subscribe)
+  # - user_memberships (auto_subscribe)
+  # - project_cost_data (on-demand, with project_id parameter)
