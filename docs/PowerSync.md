@@ -173,7 +173,7 @@ All reads in the Flutter app come from the local SQLite database, not from Supab
 
 Writes go to the local SQLite database first (optimistic), then get uploaded to Supabase via the backend connector. PowerSync queues writes and retries automatically on failure.
 
-![Write Flow](https://mermaid.ink/svg/pako:eNptk11v2jAUhv-K5atWShEhgRBfVELQoalsoou2SVNujHMarCZ25o-1HeK_zw4xaBu-SXze55zz-uuAmawAE6zhpwXBYMVprWhbCtSPjirDGe-oMOirBnUtvug6RDX60FhjQPnpNap42nADHtxIRpthfpVcPXpsK19BFe-C-cA1bimF8KD_AjPyqrnt2iOF7eiOanBFtakV6FIE2K_q7v7euSbooeIGVdTQILqo005WCap2I3gDZg3c3AbipN2FCoVlDLRGN1xo4_rfXhoNpCu3eiRoSTtjFSC2p6I-b4OTAvBkwQKyXSNp9bfs10sGZeXMXsx4xQHbNUGL7Uek_JlqE9TtetC-0Ya7VQL6siku_mhjgv0QGrLOnqV45qqF6h99kL8vNkj789pR9hIQaHTfB61A8P8yQ-qDUpfj8-OzdPbkr9N1inqm2MtXxJyFhrPzmkBUOMK14hUmRlmIcAuqpX6KDx4qsdlDCyUm7rdSLyUuxdGluMvxQ8o2ZClp6z0mz9TZjbDt_PYMT-EcVa4ZqKW0wmAymUz6Ipgc8BsmyXQ2ypLpOEmmcZbO43gW4XdM4iQfzbN8Ps_jdJblSZ4dI_y77zseZXGSZsl4PI0naZaleYTB3T-pPp1eZP8wj38AVIoY0w)
+![Write Flow](https://mermaid.ink/svg/pako:eNptVG1P2zAQ_iuWP4EUuqQlgVoTEqIMTXRbWbVNmvrFtY_WIrGDXwoM8d93rpOOUfLF8T3P3T3nO_uZCiOBMurgPoAWMFF8ZXmz0AS_lluvhGq59uSHA7tvPW9bwh35VAfvwcbtPmd-M1UeIm1qBK-7_Tu8yXUkzcwD2PmTFtGwz7owWkdaXEF4846o2VUkzEPLl9wBBnR-ZcEtdKLGSo7OzlArI5dSeSK55wlCGyJJICNyOYBHEMHDwWHCE3LUe8-DEOAcOVDaecx82KfoeBhqcs3IBW99sEDEmutVVzgCPXwTIAAJbW24fA3GCllnn6DEXkS0Izy7YuR89pnY2DnnEza76pCfvFZYF5Dv03mvite-l5wMncdOp9G3yjYg_0M78Nf5lLjYlSUXd4kAtdvGJxPQCiQ5OB6WeXH4NnaqYwa2Uc4po4lMdLC2796rshLbPw6Eadoa4tkTbwiXG47jSe7jYb1x2jWzwWYKLKJWwhPYgPb_mF8NHobZpCHN4gxg_9bmIckgUvHarNjHpf1wtqB7YgdbIM1vaiNpcaTAbhBb0PfS9FP0rfUKg-F07jzBOjQ4Usd49VN3mlrSjK6skpR5GyCjDargcUufI2VB_RoaWFCGv9LexbQv6IIz_9uYpveyJqzWlN1y7E5GQxunoLvVO6vFZGAvTNCesqrcxqDsmT5SVuT54Lgq8rIcDXEpRqOMPqF5PBwUZXFS5cfVOM_Hpy8Z_bPNmg-qk2E5Lk_LvBpV1WmRUcBbZeyX9LJsH5heyOUW6aXy4E286Wn_8hdDz3HI)
 
 > ✅ **Supabase is still the source of truth.** PowerSync is a sync layer, not a database replacement. All business logic, validation, and authorization for writes still runs on Supabase (via RLS, triggers, and edge functions). PowerSync just ensures the results of those writes get propagated back to all relevant devices.
 
@@ -223,7 +223,7 @@ For these advanced cases, implement custom conflict resolution in your Supabase 
 
 ---
 
-## 4. Sync Streams Configuration
+## 5. Sync Streams Configuration
 
 Sync Streams are defined in a YAML file deployed to the PowerSync instance (via the PowerSync Dashboard for cloud, or `config.yaml` for self-hosted). Construculator uses `edition: 3`, which is the current recommended version.
 
@@ -349,7 +349,7 @@ Syncing all cost estimates and items for all projects upfront would be wasteful 
 
 ---
 
-## 5. Flutter SDK Integration
+## 6. Flutter SDK Integration
 
 The PowerSync Flutter SDK wraps a local SQLite database and handles sync in the background. App code interacts entirely with the local DB — the SDK takes care of the rest.
 
@@ -441,7 +441,8 @@ class SupabaseConnector extends PowerSyncBackendConnector {
         // The local optimistic change persists; surface a conflict
         // message to the user via a separate error state.
         await tx.complete();
-        // TODO: emit conflict event to UI layer
+        // TODO: [CA-660] Emit conflict event to UI layer when RLS denial is detected.
+        // https://ripplearc.youtrack.cloud/issue/CA-660
         return;
       }
       // Transient failure (network timeout, server error, etc.) —
@@ -530,7 +531,7 @@ After 24 hours of inactivity (no active subscription to a stream with specific p
 
 ---
 
-## 6. Security Model
+## 7. Security Model
 
 PowerSync and Supabase handle security at different layers. Both are required — they are complementary, not redundant.
 
@@ -621,7 +622,7 @@ For Construculator, if implementing PR #25 (JWT Project Claims), use JWT-based a
 
 ---
 
-## 7. Local Development & Deployment
+## 8. Local Development & Deployment
 
 ### Local Stack
 
@@ -770,7 +771,7 @@ Verify the endpoint is working: `curl <PS_BACKEND_JWKS_URI>` should return a JSO
 
 ---
 
-## 8. Pricing & Infrastructure
+## 9. Pricing & Infrastructure
 
 | Users | Supabase (DB + Auth) | PowerSync Managed | PowerSync Self-Hosted |
 |---|---|---|---|
@@ -804,7 +805,7 @@ Self-hosted PowerSync runs as a single Docker service. EC2 instance sizing by lo
 
 ---
 
-## 9. Migration Guide to JWT-Based Authorization
+## 10. Migration Guide to JWT-Based Authorization
 
 If implementing the JWT custom claims approach for permissions, the PowerSync stream configuration needs to be updated to use `auth.jwt_claim()` instead of database queries.
 
