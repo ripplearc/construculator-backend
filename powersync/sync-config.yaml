@@ -1,13 +1,57 @@
-# PowerSync Sync Streams Configuration - Simple Test
+# PowerSync Sync Streams Configuration
 # Edition 3: https://docs.powersync.com/usage/sync-streams
 
-# Sync streams for edition 3
 config:
   edition: 3
 
 streams:
+  # ── GLOBAL DATA ─────────────────────────────────────────────────
+  # Reference data needed by all users
   global:
     auto_subscribe: true
     queries:
       - SELECT * FROM professional_roles
-    # TODO: CA-647 Configure Sync Streams for core entities (users, projects, memberships, estimation)
+
+  # ── 1. USER PROFILE ─────────────────────────────────────────────
+  # Filter by users.id directly using internal_user_id from the JWT.
+  # The custom_access_token_hook injects app_metadata.internal_user_id
+  # at token generation, so no users-table lookup is needed here.
+  my_user:
+    auto_subscribe: true
+    query: |
+      SELECT id, email, first_name, last_name,
+             professional_role, user_status,
+             user_preferences, country_code,
+             created_at, updated_at
+      FROM users
+      WHERE id = auth.parameter('$.app_metadata.internal_user_id')
+
+  # ── 2. USER'S PROJECTS ──────────────────────────────────────────
+  # CTE filters memberships by internal_user_id (from JWT) — no users join.
+  # Only syncs active projects where the user is 'joined'.
+  user_projects:
+    auto_subscribe: true
+    with:
+      accessible_projects: |
+        SELECT pm.project_id AS id
+        FROM project_members pm
+        INNER JOIN projects p ON p.id = pm.project_id
+        WHERE pm.user_id = auth.parameter('$.app_metadata.internal_user_id')
+          AND pm.membership_status = 'joined'
+          AND p.project_status = 'active'
+    query: |
+      SELECT id, project_name, description,
+             creator_user_id, project_status,
+             created_at, updated_at
+      FROM projects
+      WHERE id IN (SELECT id FROM accessible_projects)
+
+  # ── 3. PROJECT MEMBERSHIPS ──────────────────────────────────────
+  # Direct filter by internal_user_id from the JWT — no CTE needed.
+  user_memberships:
+    auto_subscribe: true
+    query: |
+      SELECT id, project_id, user_id, role_id,
+             joined_at, membership_status
+      FROM project_members
+      WHERE user_id = auth.parameter('$.app_metadata.internal_user_id')
