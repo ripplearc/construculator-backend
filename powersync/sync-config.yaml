@@ -41,8 +41,9 @@ streams:
           AND p.project_status = 'active'
     query: |
       SELECT id, project_name, description,
-             creator_user_id, project_status,
-             created_at, updated_at
+             creator_user_id, owning_company_id,
+             export_folder_link, export_storage_provider,
+             project_status, created_at, updated_at
       FROM projects
       WHERE id IN (SELECT id FROM accessible_projects)
 

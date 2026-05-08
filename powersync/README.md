@@ -110,6 +110,59 @@ streams:
 
 Restart PowerSync after changes: `docker compose restart powersync`
 
+## Testing Sync Streams (without a frontend)
+
+You can verify sync rules and JWT-scoped data without building a client. Use the hosted
+[PowerSync Diagnostics App](https://diagnostics-app.powersync.com).
+
+### 1. Get a JWT from local Supabase
+
+Sign in against your local Supabase Auth to get an access token (replace credentials):
+
+```bash
+# Load Supabase anon key from your Supabase env
+SUPABASE_URL="http://localhost:54321"
+SUPABASE_ANON_KEY="<your local anon key from `npx supabase status`>"
+
+curl -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $SUPABASE_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"yourpassword"}' \
+  | jq -r .access_token
+```
+
+The returned JWT carries the `app_metadata.internal_user_id` claim injected by the
+`custom_access_token_hook` — that's what the sync rules filter on.
+
+### 2. Connect the Diagnostics App
+
+Open https://diagnostics-app.powersync.com and provide:
+
+- **Endpoint**: `http://localhost:${PS_PORT}` (read `PS_PORT` from your `.env`, default `8081`)
+- **Token**: the JWT from step 1
+
+> Browsers may block HTTPS → `http://localhost`. If so, allow insecure content for the
+> diagnostics origin, or use Firefox.
+
+You'll see streams resolve, bucket contents, row counts, and any sync rule errors live.
+
+### 3. (Optional) Hit the PowerSync API directly
+
+Some admin endpoints require the service API token (not a user JWT). Read `PS_API_TOKEN`
+from your `.env`:
+
+```bash
+# Load values from .env
+source .env
+
+# Health check
+curl "http://localhost:${PS_PORT}/api/health"
+
+# Admin endpoints use the API token
+curl -H "Authorization: Bearer ${PS_API_TOKEN}" \
+  "http://localhost:${PS_PORT}/probes/liveness"
+```
+
 ## Troubleshooting
 
 **PowerSync won't start:**
