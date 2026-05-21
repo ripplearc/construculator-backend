@@ -1,0 +1,66 @@
+services:
+  # MongoDB for PowerSync bucket storage
+  mongo:
+    image: mongo:7.0
+    command: --replSet rs0 --bind_ip_all --quiet
+    container_name: powersync_mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_storage:/data/db
+    networks:
+      - supabase_network_construculator-backend
+
+  # Initialize MongoDB replica set
+  mongo-rs-init:
+    image: mongo:7.0
+    container_name: powersync_mongo_init
+    depends_on:
+      - mongo
+    restart: on-failure
+    entrypoint:
+      - bash
+      - -c
+      - "mongosh --host mongo:27017 --eval 'try{rs.status().ok && quit(0)} catch
+        {} rs.initiate({_id: \"rs0\", version: 1, members: [{ _id: 0, host :
+        \"mongo:27017\" }]})'"
+    networks:
+      - supabase_network_construculator-backend
+
+  powersync:
+    image: journeyapps/powersync-service:1.20.5
+    container_name: powersync
+    depends_on:
+      mongo-rs-init:
+        condition: service_completed_successfully
+    ports:
+      - "${PS_PORT:-8081}:8080"
+    env_file:
+      - .env
+    volumes:
+      - ./service.yaml:/config/service.yaml:ro
+      - ./sync-config.yaml:/config/sync-config.yaml:ro
+    environment:
+      POWERSYNC_CONFIG_PATH: /config/service.yaml
+      PS_MONGO_URI: mongodb://mongo:27017/powersync
+    networks:
+      - supabase_network_construculator-backend
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget --quiet --tries=1 --spider http://localhost:8080/api/health",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  supabase_network_construculator-backend:
+    external: true
+    name: supabase_network_construculator-backend
+
+volumes:
+  mongo_storage:

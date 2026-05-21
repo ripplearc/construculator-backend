@@ -1,3 +1,8 @@
 node_modules
 .vscode
 reviews
+*/.env
+
+# Supabase auth signing key (contains EC private key — never commit)
+supabase/signing_key.json
+supabase/signing_keys.json

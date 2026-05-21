@@ -1,0 +1,39 @@
+# PowerSync Service Configuration
+port: 8080
+
+# Logging
+log_level: info
+
+# Storage backend (MongoDB required for bucket storage)
+# PostgreSQL is used for replication (data source)
+# MongoDB is used for PowerSync internal state
+storage:
+  type: mongodb
+  uri: !env PS_MONGO_URI
+
+# Source database replication
+replication:
+  connections:
+    - id: supabase
+      type: postgresql
+      uri: !env PS_POSTGRES_URI
+      # WARNING: sslmode: disable is for LOCAL DEVELOPMENT ONLY.
+      # For any non-local deployment, use sslmode: verify-full (or require) and configure TLS.
+      sslmode: disable
+
+# Client authentication via Supabase
+client_auth:
+  jwks_uri: !env PS_JWKS_URI
+
+# API authentication
+api:
+  token: !env PS_API_TOKEN
+
+# Sync configuration file
+sync_config:
+  path: /config/sync-config.yaml
+
+# Telemetry
+telemetry:
+  disable_telemetry_sharing: true
+  internal_metrics: {}

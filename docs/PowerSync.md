@@ -516,7 +516,7 @@ final estimates = await db.getAll(
 sub.unsubscribe();
 ```
 
-**What happens after the 24-hour TTL expires?**
+**What happens to data when the application explicitly unsubscribes from a stream**
 
 After 24 hours of inactivity (no active subscription to a stream with specific parameters):
 
