@@ -4,8 +4,6 @@ CREATE FUNCTION public.get_project_search_suggestions(user_id uuid)
  LANGUAGE plpgsql
  SET search_path TO 'public'
 AS $function$
-DECLARE
-  v_suggestions text[];
 BEGIN
 
   -- Anti-spoof guard: reject calls where the passed user_id does not
@@ -16,18 +14,17 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Step 1: Personal history — own searches that returned results
-  SELECT ARRAY(
+  -- Personal history — own searches that returned results.
+  -- SELECT ARRAY(subquery) returns '{}'::text[] when the subquery is empty,
+  -- never NULL, so no COALESCE fallback is required.
+  RETURN ARRAY(
     SELECT psh.search_term
     FROM project_search_history psh
     WHERE psh.user_id = auth.uid()
       AND psh.has_results = true
     ORDER BY psh.search_count DESC
     LIMIT 10
-  ) INTO v_suggestions;
-
-  -- Step 2: empty array if nothing found
-  RETURN COALESCE(v_suggestions, ARRAY[]::text[]);
+  );
 
 END;
 $function$;
@@ -46,8 +43,8 @@ CREATE INDEX project_search_history_updated_at_idx ON public.project_search_hist
 CREATE UNIQUE INDEX project_search_history_user_term_uq ON public.project_search_history (user_id, search_term);
 CREATE INDEX project_search_history_user_id_idx ON public.project_search_history (user_id);
 CREATE INDEX project_search_history_has_results_idx ON public.project_search_history (has_results) WHERE has_results = true;
-CREATE TRIGGER trigger_increment_project_search_count BEFORE UPDATE ON public.project_search_history FOR EACH ROW WHEN (NOT old.user_id IS DISTINCT FROM new.user_id AND NOT old.search_term::text IS DISTINCT FROM new.search_term::text) EXECUTE FUNCTION public.increment_search_count();
-CREATE TRIGGER trigger_set_project_search_history_updated_at BEFORE UPDATE ON public.project_search_history FOR EACH ROW EXECUTE FUNCTION public.set_search_history_updated_at();
+CREATE OR REPLACE TRIGGER trigger_increment_project_search_count BEFORE UPDATE ON public.project_search_history FOR EACH ROW WHEN (NOT old.user_id IS DISTINCT FROM new.user_id AND NOT old.search_term::text IS DISTINCT FROM new.search_term::text) EXECUTE FUNCTION public.increment_search_count();
+CREATE OR REPLACE TRIGGER trigger_set_project_search_history_updated_at BEFORE UPDATE ON public.project_search_history FOR EACH ROW EXECUTE FUNCTION public.set_search_history_updated_at();
 CREATE POLICY project_search_history_delete_policy ON public.project_search_history FOR DELETE USING ((user_id = auth.uid()));
 CREATE POLICY project_search_history_insert_policy ON public.project_search_history FOR INSERT WITH CHECK ((user_id = auth.uid()));
 CREATE POLICY project_search_history_select_policy ON public.project_search_history FOR SELECT USING ((user_id = auth.uid()));

@@ -48,8 +48,6 @@ LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = public
 AS $$
-DECLARE
-  v_suggestions text[];
 BEGIN
 
   -- Anti-spoof guard: reject calls where the passed user_id does not
@@ -60,18 +58,17 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  -- Step 1: Personal history — own searches that returned results
-  SELECT ARRAY(
+  -- Personal history — own searches that returned results.
+  -- SELECT ARRAY(subquery) returns '{}'::text[] when the subquery is empty,
+  -- never NULL, so no COALESCE fallback is required.
+  RETURN ARRAY(
     SELECT psh.search_term
     FROM project_search_history psh
     WHERE psh.user_id = auth.uid()
       AND psh.has_results = true
     ORDER BY psh.search_count DESC
     LIMIT 10
-  ) INTO v_suggestions;
-
-  -- Step 2: empty array if nothing found
-  RETURN COALESCE(v_suggestions, ARRAY[]::text[]);
+  );
 
 END;
 $$;
