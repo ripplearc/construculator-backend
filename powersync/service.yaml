@@ -24,6 +24,8 @@ replication:
 # Client authentication via Supabase
 client_auth:
   jwks_uri: !env PS_JWKS_URI
+  audience:
+    - authenticated
 
 # API authentication
 api:
