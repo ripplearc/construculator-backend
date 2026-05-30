@@ -56,3 +56,38 @@ streams:
              joined_at, membership_status
       FROM project_members
       WHERE user_id = auth.parameter('$.app_metadata.internal_user_id')
+
+  # ── 4. COST ESTIMATES ───────────────────────────────────────────
+  # Gated by the 'get_cost_estimations' permission to mirror the RLS
+  # policy in 20260313081637_migrate_cost_estimates_rls_to_jwt.sql.
+  # PowerSync bypasses Postgres RLS, so the sync rule MUST enforce
+  # the same permission check the API enforces — otherwise users
+  # without the permission would still receive the rows.
+  #
+  # Soft-deleted rows (deleted_at IS NOT NULL) are excluded.
+  user_cost_estimates:
+    auto_subscribe: false  # on-demand: app subscribes when user enters cost estimation feature to avoid evaluating the 4-table CTE join on every connection startup
+    with:
+      cost_estimate_projects: |
+        SELECT DISTINCT pm.project_id AS id
+        FROM project_members pm
+        INNER JOIN projects p ON p.id = pm.project_id
+        INNER JOIN role_permissions rp ON rp.role_id = pm.role_id
+        INNER JOIN permissions perm ON perm.id = rp.permission_id
+        WHERE pm.user_id = auth.parameter('$.app_metadata.internal_user_id')
+          AND pm.membership_status = 'joined'
+          AND p.project_status = 'active'
+          AND perm.permission_key = 'get_cost_estimations'
+    # deleted_at intentionally excluded: used only in WHERE filter; soft-deleted rows disappear from the client stream entirely
+    query: |
+      SELECT id, project_id, estimate_name, estimate_description,
+             creator_user_id, markup_type,
+             overall_markup_value_type, overall_markup_value,
+             material_markup_value_type, material_markup_value,
+             labor_markup_value_type, labor_markup_value,
+             equipment_markup_value_type, equipment_markup_value,
+             total_cost, is_locked, locked_by_user_id, locked_at,
+             created_at, updated_at
+      FROM cost_estimates
+      WHERE project_id IN (SELECT id FROM cost_estimate_projects)
+        AND deleted_at IS NULL
