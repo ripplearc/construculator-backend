@@ -103,8 +103,8 @@ INSERT INTO companies (
 UPDATE companies
 SET
   name = 'Acme Construction Inc.',
-  logo_url = 'https://storage.example.com/logos/acme_new.png',
-  updated_at = now()
+  logo_url = 'https://storage.example.com/logos/acme_new.png'
+  -- updated_at is set automatically by trigger
 WHERE id = 'company-uuid';
 ```
 
