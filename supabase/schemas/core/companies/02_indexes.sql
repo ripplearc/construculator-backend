@@ -1,0 +1,2 @@
+-- Companies Indexes
+-- No additional indexes defined beyond primary key and unique constraints
