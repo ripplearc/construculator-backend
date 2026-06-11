@@ -32,3 +32,4 @@ SELECT has_index('public', 'project_members','project_user_membership_uq', ARRAY
 
 select * from finish();
 rollback;
+-- CI environment check (no-op)
