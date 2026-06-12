@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - "supabase/**/*.sql"
+      - "supabase/config.toml"
+      - ".github/workflows/database_tests.yml"
 
 jobs:
   database-tests:
