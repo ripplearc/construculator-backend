@@ -5,6 +5,7 @@
 -- Public SELECT Policy
 -- Tags are reference data used for search filtering; anyone can read them.
 
+DROP POLICY IF EXISTS "tags_select_public" ON "public"."tags";
 CREATE POLICY "tags_select_public" ON "public"."tags" FOR SELECT USING (true);
 
 -- No INSERT/UPDATE/DELETE policies defined.
