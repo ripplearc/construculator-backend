@@ -16,6 +16,13 @@ extra_search_path = ["public", "extensions"]
 # The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
 # for accidental or malicious requests.
 max_rows = 1000
+# Keep the legacy automatic Data API grants (anon/authenticated/service_role) on new public
+# objects. Supabase CLI >= 2.106.0 defaults this to false and revokes those privileges on
+# db start/reset, which breaks our tests since the schema has no explicit GRANTs yet.
+# Supabase removes this setting on 2026-10-30.
+# TODO: [CA-729] Replace with explicit GRANTs in supabase/schemas/ and remove this setting.
+# https://ripplearc.youtrack.cloud/issue/CA-729
+auto_expose_new_tables = true
 
 [db]
 # Port to use for the local database URL.
