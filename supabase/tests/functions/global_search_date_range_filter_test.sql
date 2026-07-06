@@ -2,16 +2,18 @@ BEGIN;
 
 -- Tests for CA-752: global_search's filter_by_date_from/filter_by_date_to
 -- range filter. Assumes projects.updated_at is correctly maintained by the
--- trigger added in migration 36 (covered separately by
+-- trigger added in migration 35 (covered separately by
 -- supabase/tests/database/projects_updated_at_trigger_test.sql).
 
 SELECT plan(9);
 
+-- Name-only existence check: the exact parameter signature is pinned by
+-- the newest signature-changing suite (global_search_multi_owner_filter_test)
+-- so signature churn doesn't break this date-range suite too (CA-737 review).
 SELECT has_function(
   'public',
   'global_search',
-  ARRAY['text', 'text', 'timestamp with time zone', 'timestamp with time zone', 'uuid', 'text', 'integer', 'integer', 'integer', 'integer'],
-  'global_search has the filter_by_date_from/filter_by_date_to signature'
+  'global_search RPC exists'
 );
 
 DO $$

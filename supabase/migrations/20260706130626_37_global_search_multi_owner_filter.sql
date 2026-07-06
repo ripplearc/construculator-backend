@@ -1,53 +1,18 @@
--- Functions for the Global Search feature (dashboard-wide search across
--- projects, cost estimates, and members).
+-- CA-737: Replace global_search's single filter_by_owner with a
+-- filter_by_owners uuid[] so the Flutter owner filter sheet can send
+-- every selected owner instead of only the alphabetically-first one.
+-- NULL and an empty array both mean "no owner filter" — an empty array
+-- is the natural "no owners selected" client state and must not
+-- silently match zero rows (creator_user_id = ANY('{}') is always false).
+-- Generated via `supabase db diff --from=migrations --to=local` from
+-- supabase/schemas/global_search/global_search/03_functions.sql per that
+-- module's README workflow (old overload dropped in the live DB first,
+-- since CREATE OR REPLACE cannot change a signature).
+-- https://ripplearc.youtrack.cloud/issue/CA-737
 
--- ============================================================
--- global_search RPC
---
--- Parameters:
---   query                 text     — required, matched against project_name/
---                                     description, estimate_name/description,
---                                     and member first_name/last_name/email.
---   filter_by_tag         text     — reserved; not yet applied. See CA-596.
---   filter_by_date_from   timestamptz — inclusive lower bound on updated_at.
---   filter_by_date_to     timestamptz — inclusive upper bound on updated_at.
---   filter_by_owners      uuid[]   — restricts projects/estimates to rows
---                                     whose creator_user_id is in the array.
---                                     NULL or an empty array means "no owner
---                                     filter" (an empty array is the natural
---                                     "no owners selected" client state and
---                                     must not silently match zero rows).
---   scope                 text     — one of 'dashboard', 'estimation',
---                                     'member', or NULL for all.
---   projects_offset, estimations_offset, members_offset, "limit" — pagination.
---
--- Returns: jsonb { projects: [...], estimations: [...], members: [...] }
---
--- Date range filter:
---   Applies to projects.updated_at and cost_estimates.updated_at as an
---   inclusive range. Either bound may be NULL to leave that side
---   unbounded. An inverted range (filter_by_date_from > filter_by_date_to)
---   raises a 22023 error rather than silently returning no rows.
---
--- SECURITY INVOKER: relies on RLS on projects/cost_estimates/project_members/
--- users for row visibility — this function does not bypass RLS.
---
--- Privacy: the members result selects only u.id, first_name, last_name,
--- professional_role, profile_photo_url. Never select users.credential_id
--- here (prior review caught credential_id leakage on this exact RPC).
--- ============================================================
-CREATE OR REPLACE FUNCTION public.global_search(
-  query text,
-  filter_by_tag text DEFAULT NULL::text,
-  filter_by_date_from timestamp with time zone DEFAULT NULL::timestamp with time zone,
-  filter_by_date_to timestamp with time zone DEFAULT NULL::timestamp with time zone,
-  filter_by_owners uuid[] DEFAULT NULL::uuid[],
-  scope text DEFAULT NULL::text,
-  projects_offset integer DEFAULT 0,
-  estimations_offset integer DEFAULT 0,
-  members_offset integer DEFAULT 0,
-  "limit" integer DEFAULT 20
-)
+SET check_function_bodies = false;
+DROP FUNCTION public.global_search(query text, filter_by_tag text, filter_by_date_from timestamp with time zone, filter_by_date_to timestamp with time zone, filter_by_owner uuid, scope text, projects_offset integer, estimations_offset integer, members_offset integer, "limit" integer);
+CREATE FUNCTION public.global_search(query text, filter_by_tag text DEFAULT NULL::text, filter_by_date_from timestamp with time zone DEFAULT NULL::timestamp with time zone, filter_by_date_to timestamp with time zone DEFAULT NULL::timestamp with time zone, filter_by_owners uuid[] DEFAULT NULL::uuid[], scope text DEFAULT NULL::text, projects_offset integer DEFAULT 0, estimations_offset integer DEFAULT 0, members_offset integer DEFAULT 0, "limit" integer DEFAULT 20)
  RETURNS jsonb
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -173,5 +138,7 @@ BEGIN
   );
 
 END;
-$function$
-;
+$function$;
+GRANT ALL ON FUNCTION public.global_search(text, text, timestamp with time zone, timestamp with time zone, uuid[], text, integer, integer, integer, integer) TO anon;
+GRANT ALL ON FUNCTION public.global_search(text, text, timestamp with time zone, timestamp with time zone, uuid[], text, integer, integer, integer, integer) TO authenticated;
+GRANT ALL ON FUNCTION public.global_search(text, text, timestamp with time zone, timestamp with time zone, uuid[], text, integer, integer, integer, integer) TO service_role;

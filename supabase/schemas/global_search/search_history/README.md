@@ -89,25 +89,7 @@ Sets `updated_at = now()` on every row change.
 
 ### `public.global_search`
 
-Full-text search across projects, cost estimates, and members. Returns a JSON object `{ projects, estimations, members }`.
-
-**Parameters:**
-
-| Parameter | Type | Description |
-|---|---|---|
-| `query` | `text` | Search string. |
-| `filter_by_tag` | `text` | Reserved for future use — no-op until a project-tag schema exists. |
-| `filter_by_date` | `timestamptz` | Optional date filter (results on or after this date). |
-| `filter_by_owner` | `uuid` | Optional filter by creator user ID. |
-| `scope` | `text` | Limits results to a specific entity type. `NULL` returns all. |
-| `projects_offset` | `int` | Pagination offset for the projects result set (default 0). |
-| `estimations_offset` | `int` | Pagination offset for the estimations result set (default 0). |
-| `members_offset` | `int` | Pagination offset for the members result set (default 0). |
-| `limit` | `int` | Pagination limit applied to each entity independently (default 20). Up to `3 × limit` rows may be returned in total. |
-
-**Performance note:** all text matching uses leading-wildcard `LIKE`, which causes sequential scans at scale. A follow-up story should add `pg_trgm` GIN indexes or full-text search.
-
-> **TODO ([CA-598](https://ripplearc.youtrack.cloud/issue/CA-598)):** Add `pg_trgm` GIN indexes or full-text search to replace leading-wildcard `LIKE`.
+Documented in the sibling [`global_search`](../global_search/README.md) module, which owns the canonical definition (this file used to carry a stale pre-CA-752 copy of the function and its parameter table; both were removed in CA-737).
 
 ---
 
