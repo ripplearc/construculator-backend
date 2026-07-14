@@ -50,9 +50,9 @@ Project Search history is personal — there is no teammate or cross-user visibi
 
 ### 4. Orphan Risk
 
-`user_id` has no foreign key to `auth.users` (cross-schema boundary). Rows are not cascade-deleted when a user is removed. A periodic cleanup job should purge rows where `user_id` no longer exists in `auth.users`.
+`user_id` has no foreign key to `auth.users` (cross-schema boundary). Rows are not cascade-deleted when a user is removed. This is handled by a periodic cleanup job.
 
-> **TODO ([CA-597](https://ripplearc.youtrack.cloud/issue/CA-597)):** The same orphan-cleanup ticket that covers `search_history` should also purge `project_search_history` rows whose `user_id` no longer exists in `auth.users`. Extend the cleanup job's scope when CA-597 is implemented.
+**Resolved ([CA-597](https://ripplearc.youtrack.cloud/issue/CA-597)):** The daily `purge-orphaned-search-history` `pg_cron` job (03:00 UTC) also purges `project_search_history` rows whose `user_id` no longer exists in `auth.users`, via `public.purge_orphaned_search_history()`. See the [`search_history_cleanup`](../search_history_cleanup/README.md) module.
 
 ---
 
