@@ -8,7 +8,7 @@ This directory documents the RPC itself. The tables it reads (`projects`, `cost_
 
 ## RPC
 
-### `public.global_search(query, filter_by_tag, filter_by_date_from, filter_by_date_to, filter_by_owner, scope, projects_offset, estimations_offset, members_offset, "limit")`
+### `public.global_search(query, filter_by_tag, filter_by_date_from, filter_by_date_to, filter_by_owners, scope, projects_offset, estimations_offset, members_offset, "limit")`
 
 Returns `jsonb`: `{ projects: [...], estimations: [...], members: [...] }`.
 
@@ -18,7 +18,7 @@ Returns `jsonb`: `{ projects: [...], estimations: [...], members: [...] }`.
 | `filter_by_tag` | `text` | `NULL` | Reserved; not yet applied to any query. See [CA-596](https://ripplearc.youtrack.cloud/issue/CA-596). |
 | `filter_by_date_from` | `timestamptz` | `NULL` | Inclusive lower bound on `updated_at`. |
 | `filter_by_date_to` | `timestamptz` | `NULL` | Inclusive upper bound on `updated_at`. |
-| `filter_by_owner` | `uuid` | `NULL` | Restricts projects/estimates to this `creator_user_id`. |
+| `filter_by_owners` | `uuid[]` | `NULL` | Restricts projects/estimates to rows whose `creator_user_id` is in the array. `NULL` **and an empty array** both mean "no owner filter" — an empty array is the natural "no owners selected" client state and must not silently match zero rows. Replaced the single-`uuid` `filter_by_owner` in [CA-737](https://ripplearc.youtrack.cloud/issue/CA-737). |
 | `scope` | `text` | `NULL` | One of `'dashboard'`, `'estimation'`, `'member'`, or `NULL` for all three. |
 | `projects_offset`, `estimations_offset`, `members_offset` | `integer` | `0` | Independent pagination offsets per result type. |
 | `"limit"` | `integer` | `20` | Shared page size across all three result types. |
@@ -26,6 +26,10 @@ Returns `jsonb`: `{ projects: [...], estimations: [...], members: [...] }`.
 **Security:** `SECURITY INVOKER` (default — no explicit `SECURITY DEFINER`). Relies entirely on RLS for row visibility on `projects`, `cost_estimates`, and `project_members`/`users`; this function does not bypass RLS.
 
 **Privacy:** the members result selects only `id`, `first_name`, `last_name`, `professional_role`, `profile_photo_url`. Never select `users.credential_id` here — a prior review caught credential_id leakage on this exact RPC.
+
+**Performance note:** all text matching uses leading-wildcard `LIKE`, which causes sequential scans at scale.
+
+> **TODO ([CA-598](https://ripplearc.youtrack.cloud/issue/CA-598)):** Add `pg_trgm` GIN indexes or full-text search to replace leading-wildcard `LIKE`.
 
 ### Date range filter (CA-752 / CA-170 / DASH-006)
 
