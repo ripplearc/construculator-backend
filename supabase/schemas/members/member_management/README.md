@@ -38,6 +38,10 @@ Changes a member's role (any membership status). Checks, in order: caller holds 
 
 Deletes a membership. The creator can never be removed — not even by themselves (`42501`). Any member may remove **their own** row (leave project) without holding `remove_member`; removing someone else requires it. Missing membership raises `P0002`. Per the design doc, removal has **no level rule** — `remove_member` holders (Manager+) may remove any non-creator member.
 
+## Signup conversion (CA-807 4/4)
+
+`trigger_convert_pending_invitations` (`AFTER INSERT ON users`, see `04_triggers.sql`) calls `convert_pending_invitations()`: every `pending` `project_invitations` row whose `email` matches the new user's email (citext, case-insensitive) becomes a `project_members(status='invited')` row (preserving `role_id`, `invited_by_user_id`, `invited_at`) plus a `project_invite` notification. Conversion is idempotent per membership (`ON CONFLICT DO NOTHING`), and notifications are emitted only for rows actually converted. The invitation row stays `pending` until the user accepts/declines in-app — `respond_to_invitation` then marks it `accepted`/`declined`.
+
 ## Internal helpers (EXECUTE revoked from API roles)
 
 - `internal_user_id_for_auth_uid() → uuid` — resolves `auth.uid()` → `users.id` via `credential_id`; raises `42501` when the caller has no profile row. The credential id itself is never returned or exposed.

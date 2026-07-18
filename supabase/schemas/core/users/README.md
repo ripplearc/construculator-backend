@@ -103,6 +103,12 @@ SELECT check_email_exists('user@example.com');
 - Executes shared `set_current_timestamp_updated_at()` function
 - Guarantees `updated_at` matches the exact time of the change
 
+### `trigger_convert_pending_invitations`
+**Purpose**: Signup conversion of latent member invites (CA-807).
+- Listens to `AFTER INSERT` on `users` table
+- Executes `convert_pending_invitations()` — converts pending `project_invitations` matching the new user's email into `project_members(status='invited')` rows plus `project_invite` notifications
+- Owned/documented by the `schemas/members/member_management` module
+
 ## Views
 
 ### `user_profiles`
