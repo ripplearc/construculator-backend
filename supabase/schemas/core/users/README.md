@@ -132,6 +132,7 @@ Performance indexes for common queries:
 - `users_professional_role_idx` - Filter by role
 - `users_user_status_idx` - Filter by status
 - `users_created_at_idx` - Sort by registration date
+- `idx_users_email_lower` - Case-insensitive email lookup (member invite RPCs, CA-807)
 
 ## RLS Policies
 
