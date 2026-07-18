@@ -73,6 +73,17 @@ CREATE TYPE "public"."general_status_enum" AS ENUM (
 
 ALTER TYPE "public"."general_status_enum" OWNER TO "postgres";
 
+CREATE TYPE "public"."invitation_status_enum" AS ENUM (
+    'pending',
+    'accepted',
+    'declined',
+    'revoked'
+);
+
+
+ALTER TYPE "public"."invitation_status_enum" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."labor_calc_method_enum" AS ENUM (
     'per_day',
     'per_hour',
