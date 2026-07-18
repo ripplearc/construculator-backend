@@ -38,6 +38,12 @@ Changes a member's role (any membership status). Checks, in order: caller holds 
 
 Deletes a membership. The creator can never be removed — not even by themselves (`42501`). Any member may remove **their own** row (leave project) without holding `remove_member`; removing someone else requires it. Missing membership raises `P0002`. Per the design doc, removal has **no level rule** — `remove_member` holders (Manager+) may remove any non-creator member.
 
+### `create_project_with_members(p_project jsonb, p_invites jsonb DEFAULT '[]') → jsonb` (CA-808)
+
+Transactionally creates the project, the creator's Admin `joined` membership (`invited_by` NULL, per the "Owner" display convention), and processes `p_invites` through `process_project_invites` — the creator's fresh Admin membership satisfies its `invite_member` check, and every invite invariant (level rule, role validation) applies unchanged. Any failure aborts the entire creation (single function = single transaction). Returns `{"project_id": ..., "outcomes": [...]}`. `creator_user_id` is always the caller — never client-supplied. Enables CA-163's `CreateProjectWithMembersUseCase`.
+
+**Backfill** (same migration, `20260718105000_44_create_project_with_members.sql`): creator-membership Admin/`joined` rows for projects that predate the membership model, with `invited_at`/`joined_at` set to the project's `created_at`. Idempotent (`NOT EXISTS` + `ON CONFLICT DO NOTHING`), leaves any pre-existing creator membership untouched, and skips with a NOTICE when the Admin role is not seeded (e.g. local `db reset`, where seeders run after migrations).
+
 ## Signup conversion (CA-807 4/4)
 
 `trigger_convert_pending_invitations` (`AFTER INSERT ON users`, see `04_triggers.sql`) calls `convert_pending_invitations()`: every `pending` `project_invitations` row whose `email` matches the new user's email (citext, case-insensitive) becomes a `project_members(status='invited')` row (preserving `role_id`, `invited_by_user_id`, `invited_at`) plus a `project_invite` notification. Conversion is idempotent per membership (`ON CONFLICT DO NOTHING`), and notifications are emitted only for rows actually converted. The invitation row stays `pending` until the user accepts/declines in-app — `respond_to_invitation` then marks it `accepted`/`declined`.

@@ -410,3 +410,64 @@ COMMENT ON FUNCTION public.convert_pending_invitations() IS
 'AFTER INSERT trigger on users (CA-807): converts pending project_invitations matching the new user''s email into invited project_members rows plus project_invite notifications. Invitation rows stay pending until responded to in-app.';
 
 REVOKE EXECUTE ON FUNCTION public.convert_pending_invitations() FROM PUBLIC, anon, authenticated;
+
+-- =============================================================================
+-- create_project_with_members (CA-808)
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.create_project_with_members(
+  p_project jsonb,
+  p_invites jsonb DEFAULT '[]'::jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_caller_id uuid := internal_user_id_for_auth_uid();
+  v_project_name text := btrim(p_project ->> 'project_name');
+  v_admin_role_id uuid;
+  v_project_id uuid;
+  v_outcomes jsonb := '[]'::jsonb;
+BEGIN
+  IF v_project_name IS NULL OR v_project_name = '' THEN
+    RAISE EXCEPTION 'project_name is required'
+      USING ERRCODE = '22023';
+  END IF;
+
+  SELECT id INTO v_admin_role_id
+  FROM roles
+  WHERE role_name = 'Admin' AND context_type = 'project';
+
+  IF v_admin_role_id IS NULL THEN
+    RAISE EXCEPTION 'Admin role is not seeded'
+      USING ERRCODE = 'P0002';
+  END IF;
+
+  INSERT INTO projects (project_name, description, owning_company_id, creator_user_id)
+  VALUES (
+    v_project_name,
+    p_project ->> 'description',
+    (p_project ->> 'owning_company_id')::uuid,
+    v_caller_id
+  )
+  RETURNING id INTO v_project_id;
+
+  -- The creator joins immediately as Admin; invited_by is NULL by design.
+  INSERT INTO project_members (project_id, user_id, role_id, membership_status, joined_at)
+  VALUES (v_project_id, v_caller_id, v_admin_role_id, 'joined', now());
+
+  IF p_invites IS NOT NULL AND jsonb_typeof(p_invites) = 'array' AND jsonb_array_length(p_invites) > 0 THEN
+    -- Same engine and invariants as invite_project_members; the creator's
+    -- fresh Admin membership satisfies its permission check.
+    v_outcomes := process_project_invites(v_project_id, v_caller_id, p_invites);
+  END IF;
+
+  RETURN jsonb_build_object('project_id', v_project_id, 'outcomes', v_outcomes);
+END;
+$$;
+
+COMMENT ON FUNCTION public.create_project_with_members(jsonb, jsonb) IS
+'Transactionally create a project, the creator''s Admin membership, and the invited members'' rows/invitations (CA-808, enables CA-163). Any invalid invite aborts the whole creation.';
+
+REVOKE EXECUTE ON FUNCTION public.create_project_with_members(jsonb, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_project_with_members(jsonb, jsonb) TO authenticated;
