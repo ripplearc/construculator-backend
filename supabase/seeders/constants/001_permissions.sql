@@ -47,5 +47,31 @@ INSERT INTO "permissions" (
     'delete_project',
     'Permission to delete project',
     'project'
+  ),
+  -- Insert permissions for member-management operations (CA-806)
+  (
+    'get_members',
+    'Permission to view the members of a project',
+    'project'
+  ),
+  (
+    'invite_member',
+    'Permission to invite new members to a project',
+    'project'
+  ),
+  (
+    'update_member_role',
+    'Permission to change the role of a project member',
+    'project'
+  ),
+  (
+    'remove_member',
+    'Permission to remove a member from a project',
+    'project'
+  ),
+  (
+    'get_task_assignments',
+    'Permission to view task assignments within a project',
+    'project'
   )
 ON CONFLICT ("permission_key") DO NOTHING;

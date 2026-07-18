@@ -34,7 +34,7 @@ INSERT INTO "roles" (
   (
     'a50e8400-e29b-41d4-a716-446655440004',
     'Viewer',
-    2,
+    1,
     'Read-only access to project and cost estimations',
     'project'
   )
@@ -150,4 +150,27 @@ INSERT INTO "role_permissions" (
     (SELECT "id" FROM "roles" WHERE "role_name" = 'Viewer'),
     (SELECT "id" FROM "permissions" WHERE "permission_key" = 'view_project')
   )
+ON CONFLICT ("role_id", "permission_id") DO NOTHING;
+
+-- Assign member-management permissions per the CA-784 matrix (CA-806)
+INSERT INTO "role_permissions" ("role_id", "permission_id")
+SELECT r."id", p."id"
+FROM (VALUES
+  ('Viewer',       'get_members'),
+  ('Collaborator', 'get_members'),
+  ('Manager',      'get_members'),
+  ('Admin',        'get_members'),
+  ('Collaborator', 'invite_member'),
+  ('Manager',      'invite_member'),
+  ('Admin',        'invite_member'),
+  ('Manager',      'update_member_role'),
+  ('Admin',        'update_member_role'),
+  ('Manager',      'remove_member'),
+  ('Admin',        'remove_member'),
+  ('Collaborator', 'get_task_assignments'),
+  ('Manager',      'get_task_assignments'),
+  ('Admin',        'get_task_assignments')
+) AS matrix ("role_name", "permission_key")
+JOIN "roles" r ON r."role_name" = matrix."role_name"
+JOIN "permissions" p ON p."permission_key" = matrix."permission_key"
 ON CONFLICT ("role_id", "permission_id") DO NOTHING;
