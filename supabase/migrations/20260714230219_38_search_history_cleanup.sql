@@ -27,7 +27,7 @@ SET search_path = public, auth
 AS $$
 BEGIN
   -- Defense-in-depth against an authenticated Data API call. Primary access
-  -- control is the REVOKE below (anon/authenticated hold no EXECUTE); this
+  -- control is the REVOKE below (no Data API role holds EXECUTE); this
   -- guard is a second layer in case the CLI's auto_expose_new_tables grant
   -- pass re-grants EXECUTE on db reset (a repo-wide issue tracked by CA-729,
   -- affecting every function). PostgREST populates request.jwt.claims with a
@@ -64,6 +64,7 @@ purge-orphaned-search-history pg_cron job (CA-597). Not exposed via the API.';
 REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM service_role;
 GRANT EXECUTE ON FUNCTION public.purge_orphaned_search_history() TO postgres;
 
 -- ============================================================

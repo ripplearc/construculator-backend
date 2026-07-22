@@ -4,13 +4,22 @@ BEGIN;
 -- search_history and project_search_history whose user_id no longer exists in
 -- auth.users, while leaving rows of active users untouched.
 
-SELECT plan(6);
+SELECT plan(7);
 
 SELECT has_function(
   'public',
   'purge_orphaned_search_history',
   ARRAY[]::text[],
   'purge_orphaned_search_history() exists with no arguments'
+);
+
+-- The pg_cron job registered. The cron schema is not tracked by
+-- `supabase db diff`, so this is the only automated check of the wiring.
+SELECT is(
+  (SELECT count(*)::int FROM cron.job
+   WHERE jobname = 'purge-orphaned-search-history'),
+  1,
+  'pg_cron job purge-orphaned-search-history is registered'
 );
 
 -- API guard: a call carrying a JWT-claims setting (as PostgREST always sends)

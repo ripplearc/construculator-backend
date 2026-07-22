@@ -17,9 +17,11 @@
 -- cannot see under normal privileges, and (b) bypass the per-user RLS
 -- policies on both tables (each restricts DELETE to user_id = auth.uid()).
 --
--- This function is never reachable via PostgREST: EXECUTE is revoked from
--- anon/authenticated below and granted only to the postgres role that
--- pg_cron runs as.
+-- This function is not reachable via PostgREST: EXECUTE is revoked from all
+-- Data API roles (anon/authenticated/service_role) below and granted only to
+-- the postgres role that pg_cron runs as. (The CLI's auto_expose_new_tables
+-- pass may re-grant the Data API roles on db reset — CA-729; the in-body JWT
+-- guard covers that case.)
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.purge_orphaned_search_history()
 RETURNS void
@@ -29,7 +31,7 @@ SET search_path = public, auth
 AS $$
 BEGIN
   -- Defense-in-depth against an authenticated Data API call. Primary access
-  -- control is the REVOKE below (anon/authenticated hold no EXECUTE); this
+  -- control is the REVOKE below (no Data API role holds EXECUTE); this
   -- guard is a second layer in case the CLI's auto_expose_new_tables grant
   -- pass re-grants EXECUTE on db reset (a repo-wide issue tracked by CA-729,
   -- affecting every function). PostgREST populates request.jwt.claims with a
@@ -68,4 +70,5 @@ purge-orphaned-search-history pg_cron job (CA-597). Not exposed via the API.';
 REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM anon;
 REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.purge_orphaned_search_history() FROM service_role;
 GRANT EXECUTE ON FUNCTION public.purge_orphaned_search_history() TO postgres;

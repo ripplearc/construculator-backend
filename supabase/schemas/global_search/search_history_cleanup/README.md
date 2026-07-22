@@ -17,7 +17,7 @@ Deletes rows from `search_history` and `project_search_history` where `user_id` 
 - **`SECURITY DEFINER`** — required to read `auth.users` (invisible to the cron role under normal privileges) and to bypass the per-user RLS `DELETE` policies on both tables (each restricts deletes to `user_id = auth.uid()`).
 - **`SET search_path = public, auth`** — pinned, per repo convention.
 - Uses `NOT EXISTS` anti-joins against `auth.users(id)` (its PK). Note the plan is a seq scan + hash anti-join — every row must be checked, so the `user_id` indexes do **not** accelerate this query. That is fine at these tables' expected size (bounded by users × distinct terms); if they ever grow large, batch the DELETE.
-- **Not exposed via the API.** `EXECUTE` is revoked from `PUBLIC`, `anon`, and `authenticated`, and granted only to `postgres` (the role `pg_cron` runs as) — this REVOKE is the primary access control. As defense-in-depth against an *authenticated* call, the body also rejects any request carrying a non-empty `request.jwt.claims` JWT (which PostgREST sets for authenticated requests and `pg_cron` never does) with `42501`. This second layer matters because the CLI's `auto_expose_new_tables` grant pass can re-grant `EXECUTE` to the Data API roles on `db reset` (a repo-wide issue tracked by [CA-729](https://ripplearc.youtrack.cloud/issue/CA-729), affecting every function). Note the guard does not by itself stop an *anon* call (no JWT — indistinguishable from the cron path); that path relies on the REVOKE, as with every other `SECURITY DEFINER` function in this schema.
+- **Not exposed via the API.** `EXECUTE` is revoked from `PUBLIC` and all three Data API roles (`anon`, `authenticated`, `service_role`), and granted only to `postgres` (the role `pg_cron` runs as) — this REVOKE is the primary access control. Note the grant list is only guaranteed at migration time: while `auto_expose_new_tables` is on, the CLI's grant pass can re-grant `EXECUTE` to the Data API roles on `db reset` (a repo-wide issue tracked by [CA-729](https://ripplearc.youtrack.cloud/issue/CA-729), affecting every function). As defense-in-depth for that case, the body also rejects any request carrying a non-empty `request.jwt.claims` JWT (which PostgREST sets for authenticated requests and `pg_cron` never does) with `42501`. The guard does not by itself stop an *anon* call (no JWT — indistinguishable from the cron path); that path relies on the REVOKE, as with every other `SECURITY DEFINER` function in this schema.
 
 ---
 
@@ -52,6 +52,7 @@ To change cadence, edit the cron expression in `07_cron.sql` and regenerate the 
 **pgTAP** — `supabase/tests/functions/purge_orphaned_search_history_test.sql`:
 - Seeds `auth.users` with one active user and inserts rows for both that user and an orphan `user_id` into both tables.
 - Calls `purge_orphaned_search_history()` and asserts orphan rows are gone from both tables while the active user's rows survive.
+- Asserts the `purge-orphaned-search-history` job is registered in `cron.job` (the one piece of wiring `supabase db diff` cannot verify).
 
 Run with `supabase test db`.
 
