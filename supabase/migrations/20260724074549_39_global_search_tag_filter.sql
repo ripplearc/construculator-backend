@@ -1,58 +1,20 @@
--- Functions for the Global Search feature (dashboard-wide search across
--- projects, cost estimates, and members).
+-- CA-596: Apply global_search's filter_by_tag param to the projects
+-- result. Introduces the project_tags pivot (projects <-> tags;
+-- previously no project-to-tag association existed) and filters the
+-- projects block via an EXISTS probe matching tags.name exactly.
+-- NULL filter_by_tag means "no tag filter" (existing behavior).
+-- SELECT on project_tags follows project visibility
+-- (user_has_project_permission), so tag assignments of invisible
+-- projects never surface; no write policies are defined (writes are
+-- service_role / migrations only, matching the tags pattern).
+-- Generated via `supabase db diff --from=migrations --to=local` from
+-- supabase/schemas/core/project_tags/ and
+-- supabase/schemas/global_search/global_search/03_functions.sql per
+-- that module's README workflow.
+-- https://ripplearc.youtrack.cloud/issue/CA-596
 
--- ============================================================
--- global_search RPC
---
--- Parameters:
---   query                 text     — required, matched against project_name/
---                                     description, estimate_name/description,
---                                     and member first_name/last_name/email.
---   filter_by_tag         text     — restricts the projects result to
---                                     projects linked (via project_tags) to
---                                     a tag with this exact name. NULL means
---                                     no tag filter. Applies only to
---                                     projects; estimations and members are
---                                     unaffected.
---   filter_by_date_from   timestamptz — inclusive lower bound on updated_at.
---   filter_by_date_to     timestamptz — inclusive upper bound on updated_at.
---   filter_by_owners      uuid[]   — restricts projects/estimates to rows
---                                     whose creator_user_id is in the array.
---                                     NULL or an empty array means "no owner
---                                     filter" (an empty array is the natural
---                                     "no owners selected" client state and
---                                     must not silently match zero rows).
---   scope                 text     — one of 'dashboard', 'estimation',
---                                     'member', or NULL for all.
---   projects_offset, estimations_offset, members_offset, "limit" — pagination.
---
--- Returns: jsonb { projects: [...], estimations: [...], members: [...] }
---
--- Date range filter:
---   Applies to projects.updated_at and cost_estimates.updated_at as an
---   inclusive range. Either bound may be NULL to leave that side
---   unbounded. An inverted range (filter_by_date_from > filter_by_date_to)
---   raises a 22023 error rather than silently returning no rows.
---
--- SECURITY INVOKER: relies on RLS on projects/cost_estimates/project_members/
--- users for row visibility — this function does not bypass RLS.
---
--- Privacy: the members result selects only u.id, first_name, last_name,
--- professional_role, profile_photo_url. Never select users.credential_id
--- here (prior review caught credential_id leakage on this exact RPC).
--- ============================================================
-CREATE OR REPLACE FUNCTION public.global_search(
-  query text,
-  filter_by_tag text DEFAULT NULL::text,
-  filter_by_date_from timestamp with time zone DEFAULT NULL::timestamp with time zone,
-  filter_by_date_to timestamp with time zone DEFAULT NULL::timestamp with time zone,
-  filter_by_owners uuid[] DEFAULT NULL::uuid[],
-  scope text DEFAULT NULL::text,
-  projects_offset integer DEFAULT 0,
-  estimations_offset integer DEFAULT 0,
-  members_offset integer DEFAULT 0,
-  "limit" integer DEFAULT 20
-)
+SET check_function_bodies = false;
+CREATE OR REPLACE FUNCTION public.global_search(query text, filter_by_tag text DEFAULT NULL::text, filter_by_date_from timestamp with time zone DEFAULT NULL::timestamp with time zone, filter_by_date_to timestamp with time zone DEFAULT NULL::timestamp with time zone, filter_by_owners uuid[] DEFAULT NULL::uuid[], scope text DEFAULT NULL::text, projects_offset integer DEFAULT 0, estimations_offset integer DEFAULT 0, members_offset integer DEFAULT 0, "limit" integer DEFAULT 20)
  RETURNS jsonb
  LANGUAGE plpgsql
  SET search_path TO 'public'
@@ -183,5 +145,15 @@ BEGIN
   );
 
 END;
-$function$
-;
+$function$;
+CREATE TABLE public.project_tags (id uuid DEFAULT gen_random_uuid() NOT NULL, project_id uuid NOT NULL, tag_id uuid NOT NULL, applied_at timestamp with time zone DEFAULT now() NOT NULL);
+ALTER TABLE public.project_tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_tags ADD CONSTRAINT project_tags_pkey PRIMARY KEY (id);
+ALTER TABLE public.project_tags ADD CONSTRAINT project_tags_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
+ALTER TABLE public.project_tags ADD CONSTRAINT project_tags_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tags(id) ON DELETE CASCADE;
+GRANT ALL ON public.project_tags TO anon;
+GRANT ALL ON public.project_tags TO authenticated;
+GRANT ALL ON public.project_tags TO service_role;
+CREATE INDEX project_tags_tag_id_idx ON public.project_tags (tag_id);
+CREATE UNIQUE INDEX project_tag_uq ON public.project_tags (project_id, tag_id);
+CREATE POLICY project_tags_select_policy ON public.project_tags FOR SELECT USING (public.user_has_project_permission(project_id, 'view_project'::text, auth.uid()));
