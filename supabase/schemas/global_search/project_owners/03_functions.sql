@@ -8,7 +8,8 @@
 -- JWT (auth.uid() via RLS), so no explicit user id param is required.
 --
 -- Returns: one row per distinct creator of the projects the caller can
--- see, ordered by first_name, last_name for a stable sheet ordering.
+-- see, ordered by first_name, last_name (id as the final tie-breaker so
+-- two same-named owners keep a deterministic order across calls).
 --
 -- SECURITY INVOKER: project visibility comes from the projects RLS
 -- policy (user_has_project_permission(id, 'view_project', auth.uid())) —
@@ -33,6 +34,7 @@ CREATE OR REPLACE FUNCTION public.get_project_owners()
  )
  LANGUAGE sql
  STABLE
+ SECURITY INVOKER
  SET search_path TO 'public'
 AS $function$
   SELECT DISTINCT
@@ -43,5 +45,5 @@ AS $function$
     up.profile_photo_url
   FROM projects p
   JOIN user_profiles up ON up.id = p.creator_user_id
-  ORDER BY first_name, last_name;
+  ORDER BY first_name, last_name, id;
 $function$;

@@ -4,7 +4,9 @@
 -- sheets in global search and dashboard project search.
 -- Generated via `supabase db diff --from=migrations --to=local` from
 -- supabase/schemas/global_search/project_owners/03_functions.sql per
--- the global_search module README workflow.
+-- the global_search module README workflow; SECURITY INVOKER made
+-- explicit post-generation (pg_dump omits it as the default and review
+-- asked for it to be spelled out).
 -- https://ripplearc.youtrack.cloud/issue/CA-839
 
 SET check_function_bodies = false;
@@ -12,6 +14,7 @@ CREATE FUNCTION public.get_project_owners()
  RETURNS TABLE(id uuid, first_name character varying, last_name character varying, professional_role uuid, profile_photo_url text)
  LANGUAGE sql
  STABLE
+ SECURITY INVOKER
  SET search_path TO 'public'
 AS $function$
   SELECT DISTINCT
@@ -22,7 +25,7 @@ AS $function$
     up.profile_photo_url
   FROM projects p
   JOIN user_profiles up ON up.id = p.creator_user_id
-  ORDER BY first_name, last_name;
+  ORDER BY first_name, last_name, id;
 $function$;
 GRANT ALL ON FUNCTION public.get_project_owners() TO anon;
 GRANT ALL ON FUNCTION public.get_project_owners() TO authenticated;

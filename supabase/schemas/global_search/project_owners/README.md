@@ -26,4 +26,5 @@ arguments and renders the returned profiles in the owner
   the `function_returns` pin in
   `supabase/tests/functions/get_project_owners_test.sql`).
 - **Deduplication** — one row per creator regardless of how many visible
-  projects they own; ordered by `first_name, last_name` for a stable sheet.
+  projects they own; ordered by `first_name, last_name` with `id` as the
+  final tie-breaker, so same-named owners keep a deterministic order.
