@@ -15,7 +15,7 @@ Returns `jsonb`: `{ projects: [...], estimations: [...], members: [...] }`.
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | `query` | `text` | required | Matched case-insensitively against name/description fields. |
-| `filter_by_tag` | `text` | `NULL` | Reserved; not yet applied to any query. See [CA-596](https://ripplearc.youtrack.cloud/issue/CA-596). |
+| `filter_by_tag` | `text` | `NULL` | Restricts the **projects** result to projects linked to a tag with this exact name via `project_tags` (see `core/project_tags`). `NULL` means no tag filter; a name matching no tag returns zero projects. Estimations and members are unaffected. Wired in [CA-596](https://ripplearc.youtrack.cloud/issue/CA-596). |
 | `filter_by_date_from` | `timestamptz` | `NULL` | Inclusive lower bound on `updated_at`. |
 | `filter_by_date_to` | `timestamptz` | `NULL` | Inclusive upper bound on `updated_at`. |
 | `filter_by_owners` | `uuid[]` | `NULL` | Restricts projects/estimates to rows whose `creator_user_id` is in the array. `NULL` **and an empty array** both mean "no owner filter" — an empty array is the natural "no owners selected" client state and must not silently match zero rows. Replaced the single-`uuid` `filter_by_owner` in [CA-737](https://ripplearc.youtrack.cloud/issue/CA-737). |
