@@ -1,0 +1,64 @@
+-- CA-963: Add user_consents — the append-only log of consent decisions,
+-- withdrawals as well as acceptances. Completes the consent schema begun in
+-- migration 41 (consent_versions).
+--
+-- Adds consent_action_enum and the jwt_internal_user_id() RLS helper, which
+-- exists because auth.uid() returns users.credential_id while user_consents.
+-- user_id references users.id — a policy on auth.uid() matches nothing and the
+-- symptom looks like broken sync rather than a bug.
+--
+-- Written by hand rather than via `supabase db diff`: config.toml declares
+-- schema_paths = [], so the CLI has no declared schema to diff against.
+-- Mirrors supabase/schemas/consent/user_consents/ and the shared helper in
+-- supabase/schemas/_shared/01_functions.sql — keep them in step.
+-- https://ripplearc.youtrack.cloud/issue/CA-963
+
+CREATE TYPE public.consent_action_enum AS ENUM (
+  'accepted',
+  'withdrawn'
+);
+
+ALTER TYPE public.consent_action_enum OWNER TO postgres;
+
+CREATE OR REPLACE FUNCTION public.jwt_internal_user_id()
+RETURNS uuid
+LANGUAGE sql
+SECURITY INVOKER
+STABLE
+AS $$
+  SELECT NULLIF(auth.jwt() -> 'app_metadata' ->> 'internal_user_id', '')::uuid
+$$;
+
+ALTER FUNCTION public.jwt_internal_user_id() OWNER TO postgres;
+
+COMMENT ON FUNCTION public.jwt_internal_user_id() IS 'Shared RLS helper. Returns the caller''s public.users.id from the JWT app_metadata.internal_user_id claim, or NULL when the claim is absent. Use instead of auth.uid() on tables keyed by users.id -- auth.uid() resolves to users.credential_id and never matches. NULL never equals a NOT NULL user_id, so an absent claim denies rather than leaks.';
+
+CREATE TABLE IF NOT EXISTS public.user_consents (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  consent_type public.consent_type_enum NOT NULL,
+  version      integer NOT NULL,
+  action       public.consent_action_enum NOT NULL,
+  recorded_at  timestamptz NOT NULL DEFAULT now(),
+  app_version  text,
+  platform     text,
+  -- >= 0, not > 0: a withdrawal with nothing on file to revoke records 0.
+  CONSTRAINT user_consents_version_non_negative CHECK (version >= 0)
+);
+
+ALTER TABLE public.user_consents OWNER TO postgres;
+
+CREATE INDEX IF NOT EXISTS user_consents_user_type_recorded_idx
+  ON public.user_consents (user_id, consent_type, recorded_at DESC);
+
+ALTER TABLE public.user_consents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY user_consents_select_policy ON public.user_consents
+  FOR SELECT TO authenticated
+  USING (user_id = public.jwt_internal_user_id());
+
+CREATE POLICY user_consents_insert_policy ON public.user_consents
+  FOR INSERT TO authenticated
+  WITH CHECK (user_id = public.jwt_internal_user_id());
+
+-- No UPDATE or DELETE policy, deliberately: the log is append-only.
