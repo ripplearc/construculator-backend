@@ -34,13 +34,13 @@ docker compose up -d
 ### 4. Verify Connection
 ```bash
 # Check replication is active
-docker exec supabase_db_construculator-backend psql -U postgres -c \
+docker exec supabase_db_construculator-backend-e2e psql -U postgres -c \
   "SELECT slot_name, active FROM pg_replication_slots WHERE slot_name LIKE 'powersync%';"
 
 # Should show: active = t
 
 # Test data sync
-docker exec supabase_db_construculator-backend psql -U postgres -d postgres -c \
+docker exec supabase_db_construculator-backend-e2e psql -U postgres -d postgres -c \
   "INSERT INTO professional_roles (name) VALUES ('Test Role') RETURNING *;"
 
 # Check PowerSync processed it
@@ -56,8 +56,8 @@ All variables are required in `.env`:
 |----------|-------------|---------|
 | `PS_API_TOKEN`| API authentication token | Generate: `openssl rand -hex 32` |
 | `PS_PORT` | PowerSync service port | `8081` |
-| `PS_POSTGRES_URI` | PostgreSQL connection string | `postgresql://postgres:postgres@supabase_db_construculator-backend:5432/postgres` |
-| `PS_JWKS_URI`  | Supabase Auth JWKS endpoint | `http://supabase_kong_construculator-backend:8000/auth/v1/.well-known/jwks.json` |
+| `PS_POSTGRES_URI` | PostgreSQL connection string | `postgresql://postgres:postgres@supabase_db_construculator-backend-e2e:5432/postgres` |
+| `PS_JWKS_URI`  | Supabase Auth JWKS endpoint | `http://supabase_kong_construculator-backend-e2e:8000/auth/v1/.well-known/jwks.json` |
 
 ### Local Development
 
@@ -177,11 +177,11 @@ docker compose logs powersync
 **No data syncing:**
 ```bash
 # 1. Check replication slot is active
-docker exec supabase_db_construculator-backend psql -U postgres -c \
+docker exec supabase_db_construculator-backend-e2e psql -U postgres -c \
   "SELECT slot_name, active FROM pg_replication_slots WHERE slot_name LIKE 'powersync%';"
 
 # 2. Verify table is in publication
-docker exec supabase_db_construculator-backend psql -U postgres -c \
+docker exec supabase_db_construculator-backend-e2e psql -U postgres -c \
   "SELECT tablename FROM pg_publication_tables WHERE pubname = 'powersync';"
 
 # 3. Check table is in sync rules (sync-config.yaml)
