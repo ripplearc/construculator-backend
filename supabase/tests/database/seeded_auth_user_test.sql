@@ -1,5 +1,5 @@
 begin;
-select plan(5);
+select plan(6);
 
 -- The seeded public.users row is unusable for sign-in unless a matching GoTrue
 -- credential exists, which is what these assertions guard.
@@ -35,6 +35,14 @@ SELECT ok(
     WHERE u."email" = 'seeder@example.com' AND i."provider" = 'email'
   ),
   'seeded auth user should have an email identity'
+);
+
+SELECT is(
+  (SELECT i."provider_id" FROM auth.identities i
+     JOIN auth.users u ON u."id" = i."user_id"
+    WHERE u."email" = 'seeder@example.com' AND i."provider" = 'email'),
+  '850e8400-e29b-41d4-a716-446655440000',
+  'seeded identity provider_id should match the auth user id'
 );
 
 select * from finish();

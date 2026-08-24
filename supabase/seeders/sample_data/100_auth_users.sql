@@ -4,7 +4,10 @@
 -- foreign key enforces it, so without this file the seeded user can be read
 -- from the database yet can never sign in. E2E sign-in flows depend on it.
 --
--- Runs before 103_users.sql so the credential exists before it is referenced.
+-- Runs before 103_users.sql by the seeder loader's alphabetical ordering
+-- convention (100_ < 103_) so the credential exists before it is referenced.
+-- Nothing in the schema enforces this ordering — see CA-995, which tracks
+-- adding the missing public.users.credential_id -> auth.users.id FK.
 
 -- The seeded password is a fixed, well-known value. It is only ever valid
 -- against a local Docker Supabase stack started from this repository, which is
@@ -44,10 +47,16 @@ INSERT INTO auth.users (
     '',
     ''
   )
-ON CONFLICT ("id") DO NOTHING;
+-- Targetless so this also skips a conflict on the users_email_partial_key
+-- unique index, not just the primary key — otherwise a developer who already
+-- created seeder@example.com by hand (e.g. via the old manual Studio
+-- procedure) would abort the whole seed run instead of no-op'ing.
+ON CONFLICT DO NOTHING;
 
--- GoTrue resolves the email/password grant through auth.identities, so the
--- account is not usable without a matching email identity.
+-- encrypted_password on auth.users is what resolves the password grant. This
+-- identity row is still required for a complete, usable account — GoTrue
+-- treats a user with no linked identity as incomplete — but it is not what
+-- verifies the password.
 INSERT INTO auth.identities (
   "provider_id",
   "user_id",
