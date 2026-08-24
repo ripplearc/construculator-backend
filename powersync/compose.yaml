@@ -33,7 +33,7 @@ services:
       mongo-rs-init:
         condition: service_completed_successfully
     ports:
-      - "${PS_PORT:-8081}:8080"
+      - "${PS_PORT:-9081}:8080"
     env_file:
       - .env
     volumes:
