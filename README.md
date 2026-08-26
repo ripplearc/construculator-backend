@@ -68,7 +68,9 @@ Database backend for **Construculator** — a construction cost estimation platf
 > `construculator-backend`), be aware you're sharing one database between your manual work below
 > and those destructive scripts. For a stack that's genuinely yours, keep the E2E harness pointed
 > at a separate clone — renaming `project_id` in this checkout doesn't help, since the harness
-> would then just destroy whatever project the renamed `config.toml` names.
+> would then just destroy whatever project the renamed `config.toml` names. Nothing yet enforces
+> the separate-clone requirement structurally; tracked in
+> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
 
 ```bash
 # 1. Make sure you are inside the repo

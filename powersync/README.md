@@ -16,7 +16,8 @@ both point at the same directory (which is what `construculator-app`'s `E2E_BACK
 default, since it resolves to a sibling directory literally named `construculator-backend`). If
 you need both, use two checkouts: one for everyday dev (any directory name, any `project_id` you
 like), and a separate clone for the E2E harness, with `E2E_BACKEND_DIR` in `construculator-app`
-pointed at it explicitly.
+pointed at it explicitly. Nothing yet enforces this structurally — tracked in
+[CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
 
 ## Migrating from the old project_id
 
