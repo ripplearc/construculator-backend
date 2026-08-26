@@ -66,8 +66,9 @@ Database backend for **Construculator** — a construction cost estimation platf
 > checkout they're pointed at. If you're also using this checkout as the E2E harness's target
 > (`construculator-app`'s `E2E_BACKEND_DIR`, which defaults to a sibling directory named
 > `construculator-backend`), be aware you're sharing one database between your manual work below
-> and those destructive scripts. For a stack that's genuinely yours, either keep the E2E harness
-> pointed at a separate clone, or use a different `project_id` in your own checkout.
+> and those destructive scripts. For a stack that's genuinely yours, keep the E2E harness pointed
+> at a separate clone — renaming `project_id` in this checkout doesn't help, since the harness
+> would then just destroy whatever project the renamed `config.toml` names.
 
 ```bash
 # 1. Make sure you are inside the repo
@@ -86,10 +87,10 @@ npx supabase start
 On first run, Supabase will pull Docker images, apply all migrations, and seed the database. When it finishes you'll see connection details:
 
 ```
-API URL:      http://127.0.0.1:55321
-Database URL: postgresql://postgres:postgres@127.0.0.1:55322/postgres
-Studio URL:   http://127.0.0.1:55323
-Inbucket URL: http://127.0.0.1:55324
+API URL:      http://127.0.0.1:24321
+Database URL: postgresql://postgres:postgres@127.0.0.1:24322/postgres
+Studio URL:   http://127.0.0.1:24323
+Inbucket URL: http://127.0.0.1:24324
 ```
 
 ---
@@ -406,20 +407,21 @@ Setup, configuration, sync rules, and troubleshooting live in [powersync/README.
 
 | Service | Port | URL | Use For |
 |---------|------|-----|---------|
-| **API (PostgREST)** | 55321 | `http://localhost:55321` | REST API — use in your app |
-| **Database (Postgres)** | 55322 | `postgresql://postgres:postgres@localhost:55322/postgres` | Direct SQL access |
-| **Studio** | 55323 | `http://localhost:55323` | Browse data, run queries, manage auth |
-| **Inbucket (Email)** | 55324 | `http://localhost:55324` | View test OTP/email |
-| **Analytics** | 55327 | `http://localhost:55327` | Log management |
+| **API (PostgREST)** | 24321 | `http://localhost:24321` | REST API — use in your app |
+| **Database (Postgres)** | 24322 | `postgresql://postgres:postgres@localhost:24322/postgres` | Direct SQL access |
+| **Studio** | 24323 | `http://localhost:24323` | Browse data, run queries, manage auth |
+| **Inbucket (Email)** | 24324 | `http://localhost:24324` | View test OTP/email |
+| **Analytics** | 24327 | `http://localhost:24327` | Log management |
 
-These are shifted by +1000 from the Supabase CLI's usual 543xx defaults (`supabase/config.toml`)
-so this project's ports don't collide with a separate local Supabase stack on the same machine.
+These are moved to 243xx from the Supabase CLI's usual 543xx defaults (`supabase/config.toml`) so
+this project's ports don't collide with a separate local Supabase stack on the same machine, and
+sit below the OS ephemeral port range that 543xx (and the earlier 553xx attempt) fall inside.
 
 ### Viewing OTP Codes
 
 When testing signup or password reset, emails are intercepted by **Inbucket** (not actually sent):
 
-1. Open `http://localhost:55324`
+1. Open `http://localhost:24324`
 2. Find the email for your test user
 3. Copy the 6-digit OTP from the email body
 
@@ -427,7 +429,7 @@ When testing signup or password reset, emails are intercepted by **Inbucket** (n
 
 The seeded user (`seeder@example.com`) has a placeholder `credential_id`. To authenticate properly, link it to a real Supabase Auth user:
 
-1. **Create the auth user** — In Studio (`http://localhost:55323`) → Authentication → Users → Add User → enter email `seeder@example.com` and a password.
+1. **Create the auth user** — In Studio (`http://localhost:24323`) → Authentication → Users → Add User → enter email `seeder@example.com` and a password.
 2. **Copy the User UID** from the auth users list.
 3. **Update the users table** — In Table Editor → `users` table → find `seeder@example.com` → paste the UID into the `credential_id` field.
 4. **Verify** — Log in through the app. RLS policies should now work correctly.

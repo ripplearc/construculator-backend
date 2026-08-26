@@ -752,7 +752,7 @@ The JWKS URI tells PowerSync where to fetch Supabase's public signing keys to va
 PS_BACKEND_JWKS_URI=http://supabase_kong:8000/auth/v1/.well-known/jwks.json
 
 # From your host machine — use this for manual testing via curl
-PS_BACKEND_JWKS_URI=http://localhost:55321/auth/v1/.well-known/jwks.json
+PS_BACKEND_JWKS_URI=http://localhost:24321/auth/v1/.well-known/jwks.json
 
 # Supabase Cloud (production)
 PS_BACKEND_JWKS_URI=https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json

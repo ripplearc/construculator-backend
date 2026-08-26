@@ -30,21 +30,23 @@ the old stack once, from the repo root:
 #    reusing it against the renamed database would make PowerSync sync from stale state.
 docker compose -f powersync/compose.yaml down --volumes
 
-# 2. Stop and remove the pre-rename Supabase stack, including its data volumes. This targets the
-#    old project_id explicitly, since `supabase stop` (no args) only matches the project_id in
-#    the current config.toml, which is now construculator-backend-e2e. If you want to keep the
-#    old dev data instead of discarding it, drop --no-backup and back up the volume first.
-npx supabase stop --project-id construculator-backend --no-backup
+# 2. Stop the pre-rename Supabase stack. This targets the old project_id explicitly, since
+#    `supabase stop` (no args) only matches the project_id in the current config.toml, which is
+#    now construculator-backend-e2e. Modern CLI versions back up the database before stopping, so
+#    this is the recoverable default — your old dev data isn't discarded.
+npx supabase stop --project-id construculator-backend
+# Once you've confirmed you don't need that data, add --no-backup to also delete the volumes:
+#   npx supabase stop --project-id construculator-backend --no-backup
 # Or, if that doesn't match your CLI version, remove the old containers/volumes directly:
 #   docker ps -a --filter "name=supabase_.*_construculator-backend$" --format '{{.Names}}' | xargs -r docker rm -f
 #   docker volume ls --filter "name=construculator-backend$" --format '{{.Name}}' | xargs -r docker volume rm
 
 # 3. Delete your existing powersync/.env — it's gitignored and only generated once, so it still
-#    has the pre-rename hostnames (supabase_db_construculator-backend) and the old PS_PORT. It
-#    won't regenerate on its own; recreate it from the updated .env.example.
+#    has the pre-rename hostnames (supabase_db_construculator-backend) and the old PS_PORT. If
+#    you're running through the E2E harness, don't recreate it by hand — the next `start_env.sh`
+#    regenerates it from .env.example with a fresh PS_API_TOKEN. Otherwise, follow Quick Start
+#    step 1 below to recreate it manually.
 rm -f powersync/.env
-cp powersync/.env.example powersync/.env
-# Edit .env and set PS_API_TOKEN again (generate with: openssl rand -hex 32)
 ```
 
 Then start fresh with the steps below. Skipping step 1 leaves PowerSync syncing from bucket
@@ -95,7 +97,7 @@ docker exec supabase_db_construculator-backend-e2e psql -U postgres -d postgres 
   "INSERT INTO professional_roles (name) VALUES ('Test Role') RETURNING *;"
 
 # Check PowerSync processed it
-docker logs powersync --tail 10
+docker compose logs powersync --tail 10
 # Should see: "Flushed ... updates" with 0s replication lag
 ```
 
@@ -172,7 +174,7 @@ Sign in against your local Supabase Auth to get an access token (replace credent
 
 ```bash
 # Load Supabase anon key from your Supabase env
-SUPABASE_URL="http://localhost:55321"
+SUPABASE_URL="http://localhost:24321"
 SUPABASE_ANON_KEY="<your local anon key from `npx supabase status`>"
 
 curl -X POST "$SUPABASE_URL/auth/v1/token?grant_type=password" \
@@ -238,7 +240,7 @@ docker exec supabase_db_construculator-backend-e2e psql -U postgres -c \
 # 3. Check table is in sync rules (sync-config.yaml)
 
 # 4. View PowerSync logs
-docker logs powersync --tail 50
+docker compose logs powersync --tail 50
 ```
 
 **Reset everything:**
