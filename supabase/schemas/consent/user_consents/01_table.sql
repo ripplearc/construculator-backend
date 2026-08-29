@@ -7,8 +7,7 @@
 
 CREATE TABLE IF NOT EXISTS "public"."user_consents" (
   "id"           uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
-  "user_id"      uuid NOT NULL
-                   REFERENCES "public"."users"("id") ON DELETE CASCADE,
+  "user_id"      uuid NOT NULL REFERENCES "public"."users"("id"),
   "consent_type" "public"."consent_type_enum" NOT NULL,
   "version"      integer NOT NULL,
   "action"       "public"."consent_action_enum" NOT NULL,
@@ -24,7 +23,7 @@ CREATE TABLE IF NOT EXISTS "public"."user_consents" (
 
 ALTER TABLE "public"."user_consents" OWNER TO "postgres";
 
--- Two constraints deliberately ABSENT, both of which look like reasonable
+-- Three things deliberately ABSENT, all of which look like reasonable
 -- review suggestions:
 --   * No FK to consent_versions — the log must survive administrative
 --     correction of that table; a consent record is evidence and must not
@@ -32,3 +31,11 @@ ALTER TABLE "public"."user_consents" OWNER TO "postgres";
 --   * No UNIQUE on (user_id, consent_type, version) — accept, withdraw, then
 --     accept the same version again is legitimate, and all three are real
 --     events.
+--   * No ON DELETE clause on the users FK — the same reasoning as above, one
+--     table over. A hard delete of the user would otherwise take the whole
+--     consent history with it, silently, which is the one thing a compliance
+--     log cannot do. Bare (NO ACTION) blocks the delete instead, matching
+--     every other users(id) FK in this repo. Note there is no user-erasure
+--     path here to defer to: user_status is only active/inactive, and nothing
+--     deletes a users row today. A future erasure flow has to decide what
+--     happens to this log rather than inherit an answer from the DDL.

@@ -3,11 +3,12 @@ BEGIN;
 -- Tests for CA-963: user_consents, the append-only log of consent decisions.
 -- Covers the action enum wire contract, the constraints that must NOT exist
 -- (an FK to consent_versions, a uniqueness rule on re-acceptance), the
--- version >= 0 allowance that withdrawals depend on, and the RLS posture:
--- own rows only, keyed on the internal_user_id JWT claim rather than
--- auth.uid(), with no update or delete path for anyone.
+-- version >= 0 allowance that withdrawals depend on, the users FK's refusal
+-- to cascade, and the RLS posture: own rows only, keyed on the
+-- internal_user_id JWT claim rather than auth.uid(), with no update or
+-- delete path for anyone and nothing at all without the claim.
 
-SELECT plan(13);
+SELECT plan(17);
 
 -- ============================================================
 -- Shape
@@ -16,6 +17,19 @@ SELECT plan(13);
 SELECT has_table('public', 'user_consents', 'user_consents table should exist');
 SELECT has_pk('public', 'user_consents', 'user_consents should have a primary key');
 SELECT col_is_fk('public', 'user_consents', 'user_id', 'user_consents.user_id is a FK to users');
+
+-- col_is_fk above says the FK exists; this says what it was declared to do on
+-- delete. 'a' is NO ACTION; 'c' (CASCADE) would make this table lose the very
+-- history it exists to keep. Metadata only -- the behavior itself is exercised
+-- further down, once there is a user with consent rows to try deleting.
+SELECT is(
+  (SELECT confdeltype FROM pg_constraint
+     WHERE conrelid = 'public.user_consents'::regclass
+       AND contype = 'f'
+       AND confrelid = 'public.users'::regclass),
+  'a'::"char",
+  'The users FK does NOT cascade on delete (consent history outlives the user row)'
+);
 
 SELECT is(
   (SELECT array_to_string(array_agg(e.enumlabel ORDER BY e.enumsortorder), ',') COLLATE "C"
@@ -97,6 +111,17 @@ SELECT throws_ok(
   'A negative version is still rejected'
 );
 
+-- The behavioral half of the confdeltype assertion above. Catalog metadata
+-- alone would still pass if someone later cleared this table from a BEFORE
+-- DELETE trigger on users, leaving the FK untouched -- which is precisely the
+-- drift the pin exists to catch. So try the delete, and require it to fail.
+SELECT throws_ok(
+  $$DELETE FROM public.users WHERE id = '33333333-3333-3333-3333-333333333333'$$,
+  '23503',
+  NULL,
+  'Deleting a user who has consent rows is refused, not cascaded'
+);
+
 -- ============================================================
 -- RLS — own rows only, via the internal_user_id claim
 -- ============================================================
@@ -146,6 +171,33 @@ SELECT is(
      WHERE user_id = '11111111-1111-1111-1111-111111111111'),
   4::bigint,
   'A user cannot delete their consent history (append-only)'
+);
+
+-- ============================================================
+-- RLS — the claim missing entirely, not merely pointing elsewhere
+--
+-- custom_access_token_hook looks the id up by credential_id and can return
+-- NULL when the users row does not exist yet (a first-login race), so an
+-- authenticated caller with no internal_user_id claim is reachable. The
+-- helper's NULLIF then yields NULL, and NULL never equals a NOT NULL
+-- user_id -- the policies deny rather than leak. Asserted, not assumed.
+-- ============================================================
+
+SELECT set_config('request.jwt.claims',
+  '{"sub": "22222222-2222-2222-2222-222222222222"}', true);
+
+SELECT is(
+  (SELECT count(*) FROM public.user_consents),
+  0::bigint,
+  'A caller with no internal_user_id claim sees nothing, rather than everything'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.user_consents (user_id, consent_type, version, action)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'analytics', 1, 'accepted')$$,
+  '42501',
+  NULL,
+  'A caller with no internal_user_id claim cannot record consent for anyone'
 );
 
 SELECT * FROM finish();

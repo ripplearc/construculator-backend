@@ -35,7 +35,10 @@ COMMENT ON FUNCTION public.jwt_internal_user_id() IS 'Shared RLS helper. Returns
 
 CREATE TABLE IF NOT EXISTS public.user_consents (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id      uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  -- No ON DELETE clause, matching every other users(id) FK here: a hard
+  -- delete of the user is blocked while consent rows exist. The log is
+  -- evidence and must not cascade away with the row it describes.
+  user_id      uuid NOT NULL REFERENCES public.users(id),
   consent_type public.consent_type_enum NOT NULL,
   version      integer NOT NULL,
   action       public.consent_action_enum NOT NULL,

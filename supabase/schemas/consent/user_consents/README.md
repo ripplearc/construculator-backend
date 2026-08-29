@@ -18,7 +18,8 @@ is history.
 
 - `id` — UUID primary key. Assigned on insert; the client's
   `UserConsentDto.toInsertJson()` omits it
-- `user_id` — FK to `users.id`, `ON DELETE CASCADE`
+- `user_id` — FK to `users.id`. No `ON DELETE` clause, deliberately — see
+  below
 - `consent_type` — `consent_type_enum` (`terms_and_privacy`, `analytics`)
 - `version` — Integer, `CHECK (version >= 0)`. The document version this record
   refers to
@@ -50,7 +51,7 @@ trying to revoke consent.
 
 ## Deliberately Absent Constraints
 
-Both of these look like reasonable review suggestions. Neither is correct:
+All three of these look like reasonable review suggestions. None is correct:
 
 - **No FK on `(consent_type, version)` to `consent_versions`.** The log must
   survive administrative correction of the versions table. A consent record is
@@ -59,6 +60,19 @@ Both of these look like reasonable review suggestions. Neither is correct:
 - **No `UNIQUE (user_id, consent_type, version)`.** A user may accept version 2,
   withdraw it, and accept version 2 again. All three are real events and all
   three belong in the log.
+- **No `ON DELETE CASCADE` on the `users` FK.** Same reasoning as the
+  `consent_versions` FK above, one table over: a consent record is evidence,
+  and a hard delete of the user must not silently take that user's entire
+  consent history with it. The bare FK (`NO ACTION`) blocks such a delete
+  instead, which matches every other `users(id)` FK in this repo. Pinned by
+  `user_consents_test.sql` — both the declared `confdeltype` and an actual
+  refused delete — so the behavior can't drift back.
+
+  There is no user-erasure path for this to defer to: `user_status` is only
+  `active`/`inactive`, and nothing in the repo deletes a `users` row. So a
+  future erasure flow (a GDPR right-to-erasure request, say) has to make an
+  explicit decision about this log — what a compliance trail is owed on
+  erasure is a legal question, not one the FK should answer silently.
 
 ## RLS
 
@@ -99,4 +113,5 @@ a bug. The helper lives in `schemas/_shared/01_functions.sql`.
 - `consent_versions` — published document versions, and the
   `current_consent_versions` view the gate compares against. No FK links the
   two; see above.
-- `users` — `user_id` references `users.id`; user deletion cascades here.
+- `users` — `user_id` references `users.id`. A hard delete of a user is
+  blocked while consent rows exist; nothing cascades. See above.
