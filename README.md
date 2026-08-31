@@ -60,6 +60,18 @@ Database backend for **Construculator** — a construction cost estimation platf
 
 ## Getting Started
 
+> **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` — this checkout's
+> Supabase stack is named for `construculator-app`'s E2E test harness, whose scripts run
+> destructive commands (`supabase db reset`, `supabase stop --no-backup`) against whatever
+> checkout they're pointed at. If you're also using this checkout as the E2E harness's target
+> (`construculator-app`'s `E2E_BACKEND_DIR`, which defaults to a sibling directory named
+> `construculator-backend`), be aware you're sharing one database between your manual work below
+> and those destructive scripts. For a stack that's genuinely yours, keep the E2E harness pointed
+> at a separate clone — renaming `project_id` in this checkout doesn't help, since the harness
+> would then just destroy whatever project the renamed `config.toml` names. Nothing yet enforces
+> the separate-clone requirement structurally; tracked in
+> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
+
 ```bash
 # 1. Make sure you are inside the repo
 cd construculator-backend
@@ -77,10 +89,10 @@ npx supabase start
 On first run, Supabase will pull Docker images, apply all migrations, and seed the database. When it finishes you'll see connection details:
 
 ```
-API URL:      http://127.0.0.1:54321
-Database URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-Studio URL:   http://127.0.0.1:54323
-Inbucket URL: http://127.0.0.1:54324
+API URL:      http://127.0.0.1:24321
+Database URL: postgresql://postgres:postgres@127.0.0.1:24322/postgres
+Studio URL:   http://127.0.0.1:24323
+Inbucket URL: http://127.0.0.1:24324
 ```
 
 ---
@@ -399,17 +411,21 @@ Setup, configuration, sync rules, and troubleshooting live in [powersync/README.
 
 | Service | Port | URL | Use For |
 |---------|------|-----|---------|
-| **API (PostgREST)** | 54321 | `http://localhost:54321` | REST API — use in your app |
-| **Database (Postgres)** | 54322 | `postgresql://postgres:postgres@localhost:54322/postgres` | Direct SQL access |
-| **Studio** | 54323 | `http://localhost:54323` | Browse data, run queries, manage auth |
-| **Inbucket (Email)** | 54324 | `http://localhost:54324` | View test OTP/email |
-| **Analytics** | 54327 | `http://localhost:54327` | Log management |
+| **API (PostgREST)** | 24321 | `http://localhost:24321` | REST API — use in your app |
+| **Database (Postgres)** | 24322 | `postgresql://postgres:postgres@localhost:24322/postgres` | Direct SQL access |
+| **Studio** | 24323 | `http://localhost:24323` | Browse data, run queries, manage auth |
+| **Inbucket (Email)** | 24324 | `http://localhost:24324` | View test OTP/email |
+| **Analytics** | 24327 | `http://localhost:24327` | Log management |
+
+These are moved to 243xx from the Supabase CLI's usual 543xx defaults (`supabase/config.toml`) so
+this project's ports don't collide with a separate local Supabase stack on the same machine, and
+sit below the OS ephemeral port range that 543xx (and the earlier 553xx attempt) fall inside.
 
 ### Viewing OTP Codes
 
 When testing signup or password reset, emails are intercepted by **Inbucket** (not actually sent):
 
-1. Open `http://localhost:54324`
+1. Open `http://localhost:24324`
 2. Find the email for your test user
 3. Copy the 6-digit OTP from the email body
 
