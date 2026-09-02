@@ -6,7 +6,7 @@ BEGIN;
 -- force" rules the view exists to own, the v1 seed, and the read-only-for-
 -- clients RLS posture.
 
-SELECT plan(14);
+SELECT plan(18);
 
 -- ============================================================
 -- Shape
@@ -105,6 +105,32 @@ SELECT is(
   'A version whose effective_from is still in the future is not yet in force'
 );
 
+-- The "nothing in force" branch. A consent type with no published row must
+-- drop out of the view entirely rather than surface with a null version — the
+-- client reads that absence as ConsentIndeterminate. The seed guarantees both
+-- types always have a v1, so the branch is unreachable without retracting one;
+-- the rows are parked and put back so the RLS assertions below still run
+-- against the seeded state.
+CREATE TEMP TABLE retracted_analytics ON COMMIT DROP AS
+  SELECT * FROM public.consent_versions WHERE consent_type = 'analytics';
+
+DELETE FROM public.consent_versions WHERE consent_type = 'analytics';
+
+SELECT is(
+  (SELECT count(*) FROM public.current_consent_versions
+     WHERE consent_type = 'analytics'),
+  0::bigint,
+  'A consent type with nothing published is absent from the view, not null-filled'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.current_consent_versions),
+  1::bigint,
+  'The other consent type still resolves while one has nothing in force'
+);
+
+INSERT INTO public.consent_versions SELECT * FROM retracted_analytics;
+
 -- ============================================================
 -- RLS — readable by any authenticated user, writable by none
 -- ============================================================
@@ -115,6 +141,25 @@ SELECT set_config('request.jwt.claims', '{"sub": "22222222-2222-2222-2222-222222
 SELECT ok(
   (SELECT count(*) FROM public.consent_versions) > 0,
   'An authenticated user can read published consent versions'
+);
+
+-- The client never selects the base table; it selects the view. These two
+-- assertions cover that path from both sides. The behavioral one below reads
+-- the view as authenticated, which fails if the base table's SELECT policy is
+-- dropped (view returns zero rows) or the auto-exposed Data API grant is
+-- revoked (permission denied). It cannot see security_invoker being flipped
+-- off, because the SELECT policy is USING (true) — an owner-executed view and
+-- a policy-governed one return the same rows here — so the declaration is
+-- pinned separately in the catalog.
+SELECT ok(
+  (SELECT reloptions FROM pg_class WHERE relname = 'current_consent_versions')
+    @> ARRAY['security_invoker=true'],
+  'current_consent_versions is declared security_invoker (the caller''s policies govern it, not the owner''s)'
+);
+
+SELECT ok(
+  (SELECT count(*) FROM public.current_consent_versions) > 0,
+  'An authenticated user can read the resolver view through the SELECT policy and the Data API grant'
 );
 
 SELECT throws_ok(
