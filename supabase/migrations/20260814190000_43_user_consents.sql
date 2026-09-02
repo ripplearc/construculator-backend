@@ -42,11 +42,20 @@ CREATE TABLE IF NOT EXISTS public.user_consents (
   consent_type public.consent_type_enum NOT NULL,
   version      integer NOT NULL,
   action       public.consent_action_enum NOT NULL,
+  -- Client-supplied on every insert, so the DEFAULT is a fallback that never
+  -- fires in practice. Bounded on the future side only: this column orders the
+  -- history and the newest row decides the gate, so a future-dated 'accepted'
+  -- row would outrank every later withdrawal. The past is deliberately
+  -- unbounded -- an offline decision may sync arbitrarily late (CA-971).
   recorded_at  timestamptz NOT NULL DEFAULT now(),
   app_version  text,
   platform     text,
   -- >= 0, not > 0: a withdrawal with nothing on file to revoke records 0.
-  CONSTRAINT user_consents_version_non_negative CHECK (version >= 0)
+  CONSTRAINT user_consents_version_non_negative CHECK (version >= 0),
+  -- One day of slack absorbs device clock skew without admitting a row that
+  -- can never be superseded.
+  CONSTRAINT user_consents_recorded_at_not_future
+    CHECK (recorded_at <= now() + interval '1 day')
 );
 
 ALTER TABLE public.user_consents OWNER TO postgres;

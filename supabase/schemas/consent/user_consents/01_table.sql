@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS "public"."user_consents" (
   "consent_type" "public"."consent_type_enum" NOT NULL,
   "version"      integer NOT NULL,
   "action"       "public"."consent_action_enum" NOT NULL,
+  -- The client supplies this on every insert (UserConsentDto.toInsertJson),
+  -- so the DEFAULT is a fallback that never fires in practice.
   "recorded_at"  timestamptz NOT NULL DEFAULT (now()),
   "app_version"  text,
   "platform"     text,
@@ -18,7 +20,23 @@ CREATE TABLE IF NOT EXISTS "public"."user_consents" (
   -- NOT `> 0`, unlike consent_versions.version. A withdrawal records the
   -- version it revokes, and the client writes 0 when there is nothing on file
   -- to revoke; `> 0` would reject exactly those withdrawals at runtime.
-  CONSTRAINT "user_consents_version_non_negative" CHECK ("version" >= 0)
+  CONSTRAINT "user_consents_version_non_negative" CHECK ("version" >= 0),
+
+  -- Bounded on the future side only. recorded_at orders this log and the
+  -- newest row decides the gate, so a client that writes a far-future
+  -- 'accepted' row makes it permanently un-supersedable: no later withdrawal
+  -- can ever sort above it, and the gate reads as consent-given indefinitely.
+  -- The INSERT policy only checks *who* the row belongs to, so without this
+  -- the caller authors every field that decides its own gate.
+  --
+  -- The past is deliberately unbounded: an offline decision may sync
+  -- arbitrarily late (PowerSync, CA-971), so a symmetric bound would discard
+  -- legitimate records. One day of slack on the future side absorbs device
+  -- clock skew. Enforced as a CHECK rather than a trigger that clamps: this
+  -- table is evidence, and rejecting a bad write is honest where silently
+  -- rewriting the timestamp the user's device reported is not.
+  CONSTRAINT "user_consents_recorded_at_not_future"
+    CHECK ("recorded_at" <= "now"() + interval '1 day')
 );
 
 ALTER TABLE "public"."user_consents" OWNER TO "postgres";

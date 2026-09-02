@@ -3,12 +3,13 @@ BEGIN;
 -- Tests for CA-963: user_consents, the append-only log of consent decisions.
 -- Covers the action enum wire contract, the constraints that must NOT exist
 -- (an FK to consent_versions, a uniqueness rule on re-acceptance), the
--- version >= 0 allowance that withdrawals depend on, the users FK's refusal
--- to cascade, and the RLS posture: own rows only, keyed on the
--- internal_user_id JWT claim rather than auth.uid(), with no update or
--- delete path for anyone and nothing at all without the claim.
+-- version >= 0 allowance that withdrawals depend on, the one-sided bound on
+-- the client-supplied recorded_at, the users FK's refusal to cascade, and the
+-- RLS posture: own rows only, keyed on the internal_user_id JWT claim rather
+-- than auth.uid(), with no update or delete path for anyone and nothing at all
+-- without the claim.
 
-SELECT plan(17);
+SELECT plan(20);
 
 -- ============================================================
 -- Shape
@@ -111,6 +112,24 @@ SELECT throws_ok(
   'A negative version is still rejected'
 );
 
+-- recorded_at is supplied by the client on every insert and is the column
+-- that orders this log, so it is bounded on the future side only. These two
+-- pin the side that must stay open. Written against the second user so the
+-- owner's row counts in the RLS block below stay what those assertions expect.
+SELECT lives_ok(
+  $$INSERT INTO public.user_consents (user_id, consent_type, version, action, recorded_at)
+    VALUES ('33333333-3333-3333-3333-333333333333', 'analytics', 1, 'accepted',
+            now() - interval '400 days')$$,
+  'A decision taken offline and synced long afterwards is still accepted'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.user_consents (user_id, consent_type, version, action, recorded_at)
+    VALUES ('33333333-3333-3333-3333-333333333333', 'analytics', 1, 'withdrawn',
+            now() + interval '6 hours')$$,
+  'A device clock running modestly fast is absorbed rather than rejected'
+);
+
 -- The behavioral half of the confdeltype assertion above. Catalog metadata
 -- alone would still pass if someone later cleared this table from a BEFORE
 -- DELETE trigger on users, leaving the FK untouched -- which is precisely the
@@ -148,6 +167,20 @@ SELECT throws_ok(
   '42501',
   NULL,
   'A user cannot record consent in someone else''s name'
+);
+
+-- The INSERT policy checks only WHOSE row this is -- every field that decides
+-- the gate is authored by the caller. Without the recorded_at bound a user
+-- could future-date their own acceptance so that no later withdrawal ever
+-- sorts above it, reporting consent-given indefinitely. Asserted here, under
+-- the role that would actually do it, rather than only as a bare constraint.
+SELECT throws_ok(
+  $$INSERT INTO public.user_consents (user_id, consent_type, version, action, recorded_at)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'terms_and_privacy', 99, 'accepted',
+            timestamptz '2099-01-01')$$,
+  '23514',
+  NULL,
+  'A user cannot future-date their own acceptance past the point of being superseded'
 );
 
 -- UPDATE and DELETE raise nothing: with no policy the rows are invisible to
