@@ -287,7 +287,7 @@ npx supabase test db
 | `check_email_exists_test` | Email lookup RPC function |
 | `seeded_auth_user_test` | The seeded test user's GoTrue credential is complete and usable for sign-in |
 | `consent_versions_test` | Consent version constraints, the `current_consent_versions` view's in-force rules, and read-only RLS |
-| `user_consents_test` | Append-only consent log: the deliberately absent constraints, `version >= 0` for withdrawals, and own-rows-only RLS |
+| `user_consents_test` | Append-only consent log: the deliberately absent constraints, `version >= 0` for withdrawals, the one-sided `recorded_at` bound, and own-rows-only RLS |
 
 > Tests are **required to pass** on every PR — CI will block merge on failure.
 
