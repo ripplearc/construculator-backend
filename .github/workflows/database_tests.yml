@@ -25,6 +25,6 @@ jobs:
           version: 2.106.0
       - name: Generate JWT signing key
         run: |
-          printf '[]\n' > supabase/signing_key.json && npx supabase gen signing-key --algorithm ES256 --append
+          printf '[]\n' > supabase/signing_key.json && supabase gen signing-key --algorithm ES256 --append
       - run: supabase db start
       - run: supabase test db

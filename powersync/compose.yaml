@@ -1,19 +1,22 @@
+# Named so Compose namespaces containers/volumes per checkout (matching the Supabase CLI's own
+# project_id namespacing) instead of deriving the project name from the powersync/ directory,
+# which is identical across every checkout and would otherwise collide.
+name: construculator-backend-e2e-powersync
+
 services:
   # MongoDB for PowerSync bucket storage
   mongo:
     image: mongo:7.0
     command: --replSet rs0 --bind_ip_all --quiet
-    container_name: powersync_mongo
     restart: unless-stopped
     volumes:
       - mongo_storage:/data/db
     networks:
-      - supabase_network_construculator-backend
+      - supabase_network_construculator-backend-e2e
 
   # Initialize MongoDB replica set
   mongo-rs-init:
     image: mongo:7.0
-    container_name: powersync_mongo_init
     depends_on:
       - mongo
     restart: on-failure
@@ -24,16 +27,15 @@ services:
         {} rs.initiate({_id: \"rs0\", version: 1, members: [{ _id: 0, host :
         \"mongo:27017\" }]})'"
     networks:
-      - supabase_network_construculator-backend
+      - supabase_network_construculator-backend-e2e
 
   powersync:
     image: journeyapps/powersync-service:1.20.5
-    container_name: powersync
     depends_on:
       mongo-rs-init:
         condition: service_completed_successfully
     ports:
-      - "${PS_PORT:-8081}:8080"
+      - "${PS_PORT:-9081}:8080"
     env_file:
       - .env
     volumes:
@@ -43,7 +45,7 @@ services:
       POWERSYNC_CONFIG_PATH: /config/service.yaml
       PS_MONGO_URI: mongodb://mongo:27017/powersync
     networks:
-      - supabase_network_construculator-backend
+      - supabase_network_construculator-backend-e2e
     restart: unless-stopped
     healthcheck:
       test:
@@ -58,9 +60,9 @@ services:
       retries: 5
 
 networks:
-  supabase_network_construculator-backend:
+  supabase_network_construculator-backend-e2e:
     external: true
-    name: supabase_network_construculator-backend
+    name: supabase_network_construculator-backend-e2e
 
 volumes:
   mongo_storage:

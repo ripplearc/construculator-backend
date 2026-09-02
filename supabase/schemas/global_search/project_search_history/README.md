@@ -129,7 +129,7 @@ supabase db reset
 
 # 2) Apply this module's schemas to the running local DB.
 for f in supabase/schemas/global_search/project_search_history/0?_*.sql; do
-  docker exec -i supabase_db_construculator-backend \
+  docker exec -i supabase_db_construculator-backend-e2e \
     psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$f"
 done
 
