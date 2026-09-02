@@ -189,3 +189,28 @@ CREATE TYPE "public"."cost_estimation_activity_type_enum" AS ENUM (
 );
 
 ALTER TYPE "public"."cost_estimation_activity_type_enum" OWNER TO "postgres";
+
+
+-- Consent documents, versioned independently of one another. Values are the
+-- wire contract with the Flutter client (consent_wire_values.dart).
+
+CREATE TYPE "public"."consent_type_enum" AS ENUM (
+    'terms_and_privacy',
+    'analytics'
+);
+
+
+ALTER TYPE "public"."consent_type_enum" OWNER TO "postgres";
+
+
+-- What a single user_consents row states. Withdrawing appends a 'withdrawn'
+-- row rather than deleting the acceptance, so the log separates consent that
+-- was revoked from consent never given.
+
+CREATE TYPE "public"."consent_action_enum" AS ENUM (
+    'accepted',
+    'withdrawn'
+);
+
+
+ALTER TYPE "public"."consent_action_enum" OWNER TO "postgres";
