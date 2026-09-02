@@ -20,7 +20,7 @@ Database backend for **Construculator** — a construction cost estimation platf
 - [Local Development Setup](#local-development-setup)
   - [Local Services & Ports](#local-services--ports)
   - [Viewing OTP Codes](#viewing-otp-codes)
-  - [Linking the Test User to Supabase Auth](#linking-the-test-user-to-supabase-auth)
+  - [Signing In as the Seeded Test User](#signing-in-as-the-seeded-test-user)
 - [Common Commands](#common-commands)
 - [CI / CD](#ci--cd)
 - [Troubleshooting](#troubleshooting)
@@ -60,6 +60,18 @@ Database backend for **Construculator** — a construction cost estimation platf
 
 ## Getting Started
 
+> **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` — this checkout's
+> Supabase stack is named for `construculator-app`'s E2E test harness, whose scripts run
+> destructive commands (`supabase db reset`, `supabase stop --no-backup`) against whatever
+> checkout they're pointed at. If you're also using this checkout as the E2E harness's target
+> (`construculator-app`'s `E2E_BACKEND_DIR`, which defaults to a sibling directory named
+> `construculator-backend`), be aware you're sharing one database between your manual work below
+> and those destructive scripts. For a stack that's genuinely yours, keep the E2E harness pointed
+> at a separate clone — renaming `project_id` in this checkout doesn't help, since the harness
+> would then just destroy whatever project the renamed `config.toml` names. Nothing yet enforces
+> the separate-clone requirement structurally; tracked in
+> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
+
 ```bash
 # 1. Make sure you are inside the repo
 cd construculator-backend
@@ -77,10 +89,10 @@ npx supabase start
 On first run, Supabase will pull Docker images, apply all migrations, and seed the database. When it finishes you'll see connection details:
 
 ```
-API URL:      http://127.0.0.1:54321
-Database URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
-Studio URL:   http://127.0.0.1:54323
-Inbucket URL: http://127.0.0.1:54324
+API URL:      http://127.0.0.1:24321
+Database URL: postgresql://postgres:postgres@127.0.0.1:24322/postgres
+Studio URL:   http://127.0.0.1:24323
+Inbucket URL: http://127.0.0.1:24324
 ```
 
 ---
@@ -240,6 +252,7 @@ Development/test data applied in numbered order:
 
 | File | Seeds |
 |------|-------|
+| `100_auth_users` | GoTrue credential (`auth.users` + `auth.identities`) backing the test user, so `seeder@example.com` can actually sign in |
 | `101_professional_roles` | 5 roles (Project Manager, Cost Estimator, Construction Manager, Architect, Engineer) |
 | `102_companies` | Sample companies |
 | `103_users` | Test user (`seeder@example.com`) |
@@ -272,6 +285,7 @@ npx supabase test db
 | `cost_estimate_activity_logging_test` | End-to-end activity logging via triggers |
 | `cascade_delete_test` | Soft-delete cascade behavior |
 | `check_email_exists_test` | Email lookup RPC function |
+| `seeded_auth_user_test` | The seeded test user's GoTrue credential is complete and usable for sign-in |
 | `consent_versions_test` | Consent version constraints, the `current_consent_versions` view's in-force rules, and read-only RLS |
 | `user_consents_test` | Append-only consent log: the deliberately absent constraints, `version >= 0` for withdrawals, and own-rows-only RLS |
 
@@ -399,30 +413,32 @@ Setup, configuration, sync rules, and troubleshooting live in [powersync/README.
 
 | Service | Port | URL | Use For |
 |---------|------|-----|---------|
-| **API (PostgREST)** | 54321 | `http://localhost:54321` | REST API — use in your app |
-| **Database (Postgres)** | 54322 | `postgresql://postgres:postgres@localhost:54322/postgres` | Direct SQL access |
-| **Studio** | 54323 | `http://localhost:54323` | Browse data, run queries, manage auth |
-| **Inbucket (Email)** | 54324 | `http://localhost:54324` | View test OTP/email |
-| **Analytics** | 54327 | `http://localhost:54327` | Log management |
+| **API (PostgREST)** | 24321 | `http://localhost:24321` | REST API — use in your app |
+| **Database (Postgres)** | 24322 | `postgresql://postgres:postgres@localhost:24322/postgres` | Direct SQL access |
+| **Studio** | 24323 | `http://localhost:24323` | Browse data, run queries, manage auth |
+| **Inbucket (Email)** | 24324 | `http://localhost:24324` | View test OTP/email |
+| **Analytics** | 24327 | `http://localhost:24327` | Log management |
+
+These are moved to 243xx from the Supabase CLI's usual 543xx defaults (`supabase/config.toml`) so
+this project's ports don't collide with a separate local Supabase stack on the same machine, and
+sit below the OS ephemeral port range that 543xx (and the earlier 553xx attempt) fall inside.
 
 ### Viewing OTP Codes
 
 When testing signup or password reset, emails are intercepted by **Inbucket** (not actually sent):
 
-1. Open `http://localhost:54324`
+1. Open `http://localhost:24324`
 2. Find the email for your test user
 3. Copy the 6-digit OTP from the email body
 
-### Linking the Test User to Supabase Auth
+### Signing In as the Seeded Test User
 
-The seeded user (`seeder@example.com`) has a placeholder `credential_id`. To authenticate properly, link it to a real Supabase Auth user:
+`100_auth_users.sql` seeds a matching GoTrue credential for the sample `users` row, so `seeder@example.com` is signed-in-ready out of the box on `npx supabase start` / `npx supabase db reset` — no manual Studio steps needed:
 
-1. **Create the auth user** — In Studio (`http://localhost:54323`) → Authentication → Users → Add User → enter email `seeder@example.com` and a password.
-2. **Copy the User UID** from the auth users list.
-3. **Update the users table** — In Table Editor → `users` table → find `seeder@example.com` → paste the UID into the `credential_id` field.
-4. **Verify** — Log in through the app. RLS policies should now work correctly.
+- **Email:** `seeder@example.com`
+- **Password:** `e2e-local-only-password`
 
-> **Why?** The `credential_id` column links a `users` row to its Supabase Auth identity (`auth.uid()`). Without this match, RLS policies will deny access.
+This password is fixed and committed to this public repo — it is only ever valid against a local Docker Supabase stack started from this repository, never a hosted environment. `public.users.credential_id` already matches this account's `auth.users.id`, so RLS policies work correctly without any extra linking step.
 
 ---
 
