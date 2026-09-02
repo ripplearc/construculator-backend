@@ -25,6 +25,11 @@ RETURNS uuid
 LANGUAGE sql
 SECURITY INVOKER
 STABLE
+-- Pinned like every other function in this repo. auth.jwt() is already
+-- schema-qualified, so 'public' alone is sufficient; the pin exists so a
+-- future edit adding an unqualified reference cannot silently resolve
+-- against a caller-controlled search_path from inside two RLS policies.
+SET search_path TO 'public'
 AS $$
   SELECT NULLIF(auth.jwt() -> 'app_metadata' ->> 'internal_user_id', '')::uuid
 $$;
