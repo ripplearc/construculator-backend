@@ -32,6 +32,7 @@ The `users` table stores core user profile information and links to Supabase Aut
 - This is the **bridge** between authentication and application data
 - One-to-one relationship: one auth user = one profile user
 - `credential_id` is unique and required
+- Enforced by a foreign key (`users_credential_id_fkey`, `ON DELETE CASCADE`) — a `users` row can no longer point at a nonexistent `auth.users` id, and deleting the auth account removes the profile with it
 
 ### 2. Email & Phone Uniqueness
 - Email must be unique across all users
@@ -283,6 +284,7 @@ See test files:
 ## Migration Notes
 
 - `credential_id` was introduced to link auth.users
+- `credential_id -> auth.users(id)` FK (`ON DELETE CASCADE`) added under CA-995, closing the gap where a hand-inserted `users` row could point at a nonexistent auth account
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
 - View created in migration `20251218175411_create_user_profile_view.sql`

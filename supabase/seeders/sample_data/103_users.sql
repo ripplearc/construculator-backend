@@ -22,4 +22,6 @@ INSERT INTO "users" (
     (SELECT "id" FROM "professional_roles" WHERE "name" = 'Project Manager'),
     '{"theme": "light", "notifications": true}'
   )
-ON CONFLICT ("id") DO NOTHING;
+-- Targetless so this also skips a conflict on users_email_key / users_credential_id_key,
+-- not just the primary key — matches the fix already applied to 100_auth_users.sql (CA-995).
+ON CONFLICT DO NOTHING;

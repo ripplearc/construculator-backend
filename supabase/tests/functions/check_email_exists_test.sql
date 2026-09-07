@@ -37,6 +37,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- CA-995: users.credential_id now FKs to auth.users(id), so a real auth
+-- account has to exist before it can be referenced below.
+INSERT INTO auth.users (
+  "instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at",
+  "raw_app_meta_data", "raw_user_meta_data", "created_at", "updated_at",
+  "confirmation_token", "recovery_token", "email_change_token_new", "email_change"
+) VALUES (
+  '00000000-0000-0000-0000-000000000000', '10101010-1010-1010-1010-101010101010', 'authenticated', 'authenticated',
+  'existing@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+  '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''
+);
+
 -- Setup: ensure there is at least one professional_role and insert a transient user
 WITH maybe_existing AS (
   SELECT id FROM public.professional_roles LIMIT 1
@@ -51,7 +63,7 @@ WITH maybe_existing AS (
   SELECT id FROM ensured
 )
 INSERT INTO public.users (credential_id, email, first_name, last_name, professional_role, profile_photo_url, user_preferences)
-VALUES (gen_random_uuid(), 'existing@example.com', 'Test', 'User', (SELECT id FROM role LIMIT 1), NULL, '{}'::jsonb);
+VALUES ('10101010-1010-1010-1010-101010101010', 'existing@example.com', 'Test', 'User', (SELECT id FROM role LIMIT 1), NULL, '{}'::jsonb);
 
 -- Plan: 2 assertions
 SELECT plan(2);

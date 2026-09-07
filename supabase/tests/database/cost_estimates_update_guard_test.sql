@@ -18,6 +18,23 @@ DECLARE
 BEGIN
   INSERT INTO professional_roles (id, name) VALUES (v_prof_role_id, 'Test Role');
 
+  -- CA-995: users.credential_id now FKs to auth.users(id), so a real auth
+  -- account has to exist before it can be referenced below.
+  INSERT INTO auth.users (
+    "instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at",
+    "raw_app_meta_data", "raw_user_meta_data", "created_at", "updated_at",
+    "confirmation_token", "recovery_token", "email_change_token_new", "email_change"
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000000', v_credential_id, 'authenticated', 'authenticated',
+     'admin_guard@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_credential2_id, 'authenticated', 'authenticated',
+     'collab_guard@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_credential3_id, 'authenticated', 'authenticated',
+     'viewer_guard@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', '');
+
   INSERT INTO users (id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code)
     VALUES (v_user_id, v_credential_id, 'admin_guard@example.com', 'Admin', 'User', v_prof_role_id, now(), 'active', '{}', '+1');
   INSERT INTO users (id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code)
