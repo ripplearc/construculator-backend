@@ -11,13 +11,18 @@ volume, and network this stack creates carries that suffix. It's named that way 
 
 That means **this checkout should be dedicated to the E2E harness, not reused for your everyday
 local dev work.** The `project_id` rename only distinguishes Docker resource names between two
-*separate* checkouts — it does nothing if the E2E harness and your manual `npx supabase start`
-both point at the same directory (which is what `construculator-app`'s `E2E_BACKEND_DIR` does by
-default, since it resolves to a sibling directory literally named `construculator-backend`). If
-you need both, use two checkouts: one for everyday dev (any directory name, any `project_id` you
-like), and a separate clone for the E2E harness, with `E2E_BACKEND_DIR` in `construculator-app`
-pointed at it explicitly. Nothing yet enforces this structurally — tracked in
-[CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
+*separate* checkouts — it would do nothing on its own if the E2E harness and your manual
+`npx supabase start` both pointed at the same directory (which is what `construculator-app`'s
+`E2E_BACKEND_DIR` defaults to, resolving to a sibling directory literally named
+`construculator-backend`). What actually stops that: `construculator-app`'s
+`scripts/e2e/reset_env.sh` and `scripts/e2e/stop_env.sh --purge` now check the resolved
+checkout's real `project_id` before running, and refuse unless it's `construculator-backend-e2e`
+— so pointing the harness at an ordinary dev checkout (one that hasn't had this rename applied)
+fails closed instead of silently sharing this database, unless `E2E_ALLOW_SHARED_BACKEND=1`
+explicitly opts into that. Still use two checkouts if you want both a dedicated E2E stack and
+everyday dev — one for everyday dev (any directory name, any `project_id` you like), and a
+separate clone for the E2E harness, with `E2E_BACKEND_DIR` in `construculator-app` pointed at it
+explicitly. See [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007) for the app-side check.
 
 ## Migrating from the old project_id
 

@@ -63,14 +63,16 @@ Database backend for **Construculator** — a construction cost estimation platf
 > **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` — this checkout's
 > Supabase stack is named for `construculator-app`'s E2E test harness, whose scripts run
 > destructive commands (`supabase db reset`, `supabase stop --no-backup`) against whatever
-> checkout they're pointed at. If you're also using this checkout as the E2E harness's target
-> (`construculator-app`'s `E2E_BACKEND_DIR`, which defaults to a sibling directory named
-> `construculator-backend`), be aware you're sharing one database between your manual work below
-> and those destructive scripts. For a stack that's genuinely yours, keep the E2E harness pointed
-> at a separate clone — renaming `project_id` in this checkout doesn't help, since the harness
-> would then just destroy whatever project the renamed `config.toml` names. Nothing yet enforces
-> the separate-clone requirement structurally; tracked in
-> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
+> checkout they're pointed at. `construculator-app`'s `E2E_BACKEND_DIR` defaults to a sibling
+> directory named `construculator-backend`, which may or may not be this checkout — but
+> `scripts/e2e/reset_env.sh` and `scripts/e2e/stop_env.sh --purge` (in `construculator-app`) now
+> refuse to run unless the checkout they resolve to actually has `project_id =
+> "construculator-backend-e2e"`, or `E2E_ALLOW_SHARED_BACKEND=1` explicitly opts into pointing them
+> at a shared checkout anyway. So as long as this checkout's `project_id` stays as it is, those
+> scripts either act only on a checkout named like this one, or refuse outright — they no longer
+> silently share this database with your manual work below. See
+> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007) for the app-side check that enforces
+> this.
 
 ```bash
 # 1. Make sure you are inside the repo
