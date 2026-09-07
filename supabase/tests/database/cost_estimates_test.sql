@@ -25,7 +25,18 @@ DECLARE
 BEGIN
   -- Setup: Insert user and project
   INSERT INTO professional_roles (id, name) VALUES (role_id, 'Test Role');
-  INSERT INTO users (id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code) 
+  -- CA-995: users.credential_id now FKs to auth.users(id), so a real auth
+  -- account has to exist before it can be referenced here.
+  INSERT INTO auth.users (
+    "instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at",
+    "raw_app_meta_data", "raw_user_meta_data", "created_at", "updated_at",
+    "confirmation_token", "recovery_token", "email_change_token_new", "email_change"
+  ) VALUES (
+    '00000000-0000-0000-0000-000000000000', credential_id, 'authenticated', 'authenticated',
+    'cost_test@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''
+  );
+  INSERT INTO users (id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code)
     VALUES (user_id, credential_id, 'cost_test@example.com', 'Cost', 'Test', role_id, now(), 'active', '{}', '+1');
   INSERT INTO projects (id, project_name, creator_user_id, created_at, updated_at, project_status) 
     VALUES (project_id, 'Cost Test Project', user_id, now(), now(), 'active');

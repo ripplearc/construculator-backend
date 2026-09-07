@@ -24,6 +24,12 @@ DECLARE
   v_owner_a uuid := 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
   v_owner_b uuid := 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
   v_owner_c uuid := 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  -- CA-995: users.credential_id now FKs to auth.users(id); these owners
+  -- don't authenticate in this test, so a fresh random id per owner is fine,
+  -- as long as a matching auth.users row backs it (below).
+  v_owner_a_credential uuid := gen_random_uuid();
+  v_owner_b_credential uuid := gen_random_uuid();
+  v_owner_c_credential uuid := gen_random_uuid();
   v_project_a uuid := '33333333-3333-3333-3333-333333333333';
   v_project_b uuid := '44444444-4444-4444-4444-444444444444';
   v_project_c uuid := '99999999-9999-9999-9999-999999999999';
@@ -33,13 +39,33 @@ DECLARE
 BEGIN
   INSERT INTO professional_roles (id, name) VALUES (v_prof_role_id, 'Test Role');
 
+  -- CA-995: users.credential_id now FKs to auth.users(id), so a real auth
+  -- account has to exist before it can be referenced below.
+  INSERT INTO auth.users (
+    "instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at",
+    "raw_app_meta_data", "raw_user_meta_data", "created_at", "updated_at",
+    "confirmation_token", "recovery_token", "email_change_token_new", "email_change"
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000000', v_viewer_credential_id, 'authenticated', 'authenticated',
+     'owner_filter_viewer@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_owner_a_credential, 'authenticated', 'authenticated',
+     'owner_filter_a@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_owner_b_credential, 'authenticated', 'authenticated',
+     'owner_filter_b@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_owner_c_credential, 'authenticated', 'authenticated',
+     'owner_filter_c@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', '');
+
   -- The viewer runs the searches; the three owners only create rows.
   INSERT INTO users (id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code)
     VALUES
       (v_viewer_id, v_viewer_credential_id, 'owner_filter_viewer@example.com', 'Owner', 'Viewer', v_prof_role_id, now(), 'active', '{}', '+1'),
-      (v_owner_a, gen_random_uuid(), 'owner_filter_a@example.com', 'Owner', 'Alpha', v_prof_role_id, now(), 'active', '{}', '+1'),
-      (v_owner_b, gen_random_uuid(), 'owner_filter_b@example.com', 'Owner', 'Beta', v_prof_role_id, now(), 'active', '{}', '+1'),
-      (v_owner_c, gen_random_uuid(), 'owner_filter_c@example.com', 'Owner', 'Gamma', v_prof_role_id, now(), 'active', '{}', '+1');
+      (v_owner_a, v_owner_a_credential, 'owner_filter_a@example.com', 'Owner', 'Alpha', v_prof_role_id, now(), 'active', '{}', '+1'),
+      (v_owner_b, v_owner_b_credential, 'owner_filter_b@example.com', 'Owner', 'Beta', v_prof_role_id, now(), 'active', '{}', '+1'),
+      (v_owner_c, v_owner_c_credential, 'owner_filter_c@example.com', 'Owner', 'Gamma', v_prof_role_id, now(), 'active', '{}', '+1');
 
   INSERT INTO roles (id, role_name, level, context_type) VALUES (v_admin_role_id, 'TestAdmin', 4, 'project');
   INSERT INTO role_permissions (role_id, permission_id)
