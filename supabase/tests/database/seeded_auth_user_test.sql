@@ -22,7 +22,7 @@ SELECT ok(
 
 SELECT ok(
   (
-    SELECT "encrypted_password" = extensions.crypt('e2e-local-only-password', "encrypted_password")
+    SELECT "encrypted_password" = extensions.crypt('Mypass@1', "encrypted_password")
     FROM auth.users WHERE "email" = 'seeder@example.com'
   ),
   'seeded auth user password should verify against the documented seed password'

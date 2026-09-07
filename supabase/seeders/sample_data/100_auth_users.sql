@@ -13,6 +13,14 @@
 -- against a local Docker Supabase stack started from this repository, which is
 -- never exposed outside the developer machine or the CI runner. Never reuse it
 -- for a hosted environment.
+--
+-- It must also pass the app's own client-side password rules
+-- (AuthValidation.validatePassword: 8+ chars, upper, lower, digit, special
+-- from !@#$&*~), because the CUJ-1 login form rejects an invalid password
+-- before it ever reaches the backend. `e2e-local-only-password` did not (no
+-- uppercase, no special char), so CUJ-1 could never get as far as this
+-- credential. Keep this literal in sync with `TestConfig.loginPassword` in
+-- construculator-app.
 INSERT INTO auth.users (
   "instance_id",
   "id",
@@ -36,7 +44,7 @@ INSERT INTO auth.users (
     'authenticated',
     'authenticated',
     'seeder@example.com',
-    extensions.crypt('e2e-local-only-password', extensions.gen_salt('bf')),
+    extensions.crypt('Mypass@1', extensions.gen_salt('bf')),
     now(),
     '{"provider": "email", "providers": ["email"]}',
     '{}',
