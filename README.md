@@ -436,9 +436,9 @@ When testing signup or password reset, emails are intercepted by **Inbucket** (n
 `100_auth_users.sql` seeds a matching GoTrue credential for the sample `users` row, so `seeder@example.com` is signed-in-ready out of the box on `npx supabase start` / `npx supabase db reset` — no manual Studio steps needed:
 
 - **Email:** `seeder@example.com`
-- **Password:** `e2e-local-only-password`
+- **Password:** `Mypass@1`
 
-This password is fixed and committed to this public repo — it is only ever valid against a local Docker Supabase stack started from this repository, never a hosted environment. `public.users.credential_id` already matches this account's `auth.users.id`, so RLS policies work correctly without any extra linking step.
+This password is fixed and committed to this public repo — it is only ever valid against a local Docker Supabase stack started from this repository, never a hosted environment. It is also shaped to pass the app's own client-side password rules so the CUJ-1 login form accepts it. `public.users.credential_id` already matches this account's `auth.users.id`, so RLS policies work correctly without any extra linking step.
 
 ---
 
