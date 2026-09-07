@@ -50,7 +50,9 @@ mirroring "the backend's check (version > 0); CA-963 §2" — but §2 is
 `FormatException('Unreadable user consent row: version')`, and the repository
 resolves that throw to a *status* — so revoking consent silently makes the
 gate unreadable. The fix belongs in the app's DTO, not in this schema; tracked
-against CA-963 and required before the consent gate goes live.
+against CA-971 — the ticket adding the sync stream described below, and so the
+first one under which a `version = 0` row actually reaches that parser — and
+required before the consent gate goes live.
 
 ### Why `recorded_at` is bounded on the future side only
 
