@@ -60,17 +60,19 @@ Database backend for **Construculator** — a construction cost estimation platf
 
 ## Getting Started
 
-> **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` — this checkout's
-> Supabase stack is named for `construculator-app`'s E2E test harness, whose scripts run
-> destructive commands (`supabase db reset`, `supabase stop --no-backup`) against whatever
-> checkout they're pointed at. `construculator-app`'s `E2E_BACKEND_DIR` defaults to a sibling
-> directory named `construculator-backend`, which may or may not be this checkout — but
-> `scripts/e2e/reset_env.sh` and `scripts/e2e/stop_env.sh --purge` (in `construculator-app`) now
-> refuse to run unless the checkout they resolve to actually has `project_id =
-> "construculator-backend-e2e"`, or `E2E_ALLOW_SHARED_BACKEND=1` explicitly opts into pointing them
-> at a shared checkout anyway. So as long as this checkout's `project_id` stays as it is, those
-> scripts either act only on a checkout named like this one, or refuse outright — they no longer
-> silently share this database with your manual work below. See
+> **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` for every clone of
+> this repo — it's baked into the tracked config, not something set per checkout, so it does not by
+> itself tell a dedicated E2E checkout apart from an ordinary dev one like this. What actually
+> protects this checkout: `construculator-app`'s `scripts/e2e/reset_env.sh` and
+> `scripts/e2e/stop_env.sh --purge`, whose destructive commands (`supabase db reset`, `supabase
+> stop --no-backup`) run against whatever checkout they're pointed at, now refuse to run unless the
+> caller sets `E2E_BACKEND_DIR` explicitly — leaving it at its default, which resolves to a sibling
+> directory literally named `construculator-backend`, is no longer enough. So as long as nothing
+> points `E2E_BACKEND_DIR` at this checkout explicitly, those scripts refuse to run against it,
+> unless `E2E_ALLOW_SHARED_BACKEND=1` explicitly opts into sharing it anyway. Still use two
+> checkouts if you want both a dedicated E2E stack and everyday dev — one for everyday dev (any
+> directory name), and a separate clone dedicated to the E2E harness, with `E2E_BACKEND_DIR`
+> pointed at it explicitly. See
 > [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007) for the app-side check that enforces
 > this.
 
