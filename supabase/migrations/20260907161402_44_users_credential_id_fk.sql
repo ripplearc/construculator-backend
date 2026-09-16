@@ -21,6 +21,17 @@
 -- schema_paths = [], so the CLI has no declared schema to diff against (same
 -- reason migrations 41-43 were hand-written). Mirrors the FK added to
 -- supabase/schemas/core/users/01_table.sql — keep the two in step.
+--
+-- This ALTER TABLE has no NOT VALID stage or backfill: Postgres scans every
+-- existing public.users row and fails the whole migration atomically if any
+-- credential_id has no matching auth.users.id. That's the safe failure mode
+-- for a populated environment, but it does mean the migration blocks until
+-- the orphan row is found and fixed. Locally this is a non-issue (fresh seed
+-- data), and there's no auto-deploy workflow pushing migrations to a live
+-- project, but before applying this to a real environment, run:
+--   SELECT id FROM public.users u WHERE NOT EXISTS (
+--     SELECT 1 FROM auth.users a WHERE a.id = u.credential_id
+--   );
 -- https://ripplearc.youtrack.cloud/issue/CA-995
 
 ALTER TABLE ONLY "public"."users"
