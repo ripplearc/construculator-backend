@@ -440,6 +440,8 @@ When testing signup or password reset, emails are intercepted by **Inbucket** (n
 
 This password is fixed and committed to this public repo — it is only ever valid against a local Docker Supabase stack started from this repository, never a hosted environment. It is also shaped to pass the app's own client-side password rules so the CUJ-1 login form accepts it. `public.users.credential_id` already matches this account's `auth.users.id`, so RLS policies work correctly without any extra linking step.
 
+If you already had this account from before this change, run `npx supabase db reset` — re-running the seeders alone will not update an existing account's password.
+
 ---
 
 ## Common Commands
