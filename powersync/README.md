@@ -9,15 +9,22 @@ volume, and network this stack creates carries that suffix. It's named that way 
 `construculator-app`'s E2E test harness treats this backend as disposable: its scripts run
 `supabase db reset` and `supabase stop --no-backup` against whatever checkout they're pointed at.
 
-That means **this checkout should be dedicated to the E2E harness, not reused for your everyday
-local dev work.** The `project_id` rename only distinguishes Docker resource names between two
-*separate* checkouts — it does nothing if the E2E harness and your manual `npx supabase start`
-both point at the same directory (which is what `construculator-app`'s `E2E_BACKEND_DIR` does by
-default, since it resolves to a sibling directory literally named `construculator-backend`). If
-you need both, use two checkouts: one for everyday dev (any directory name, any `project_id` you
-like), and a separate clone for the E2E harness, with `E2E_BACKEND_DIR` in `construculator-app`
-pointed at it explicitly. Nothing yet enforces this structurally — tracked in
-[CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
+That means **this checkout must be dedicated to the E2E harness — not reused for your everyday
+local dev work.** `project_id` is the same `construculator-backend-e2e` in every clone of this
+repo, baked into the tracked `supabase/config.toml`; it cannot by itself distinguish a dedicated
+E2E checkout from an ordinary dev one, since every checkout already has it. `construculator-app`'s
+`scripts/e2e/reset_env.sh` and `scripts/e2e/stop_env.sh --purge` do also compare the resolved
+checkout's `project_id` against `construculator-backend-e2e`, but that only catches a checkout from
+before the CA-991 rename — it's not what keeps these scripts off your dev checkout today. What
+actually does: those scripts now refuse to run unless the caller sets `E2E_BACKEND_DIR`
+explicitly — leaving it at its default, which resolves to a sibling directory literally named
+`construculator-backend`, is no longer enough, since that's an ordinary name any dev checkout
+might have. So you need two checkouts: one for everyday dev (any directory name, any `project_id`
+you like), and one dedicated to the E2E harness, with `E2E_BACKEND_DIR` in `construculator-app`
+pointed at it explicitly — that's what keeps the harness off your dev database, not the
+`project_id` rename. `E2E_ALLOW_SHARED_BACKEND=1` explicitly opts out of both checks if you really
+want to point the harness at a shared checkout anyway. See
+[CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007) for the app-side check.
 
 ## Migrating from the old project_id
 
