@@ -45,3 +45,13 @@ ALTER TABLE ONLY "public"."users"
 
 ALTER TABLE ONLY "public"."users"
     ADD CONSTRAINT "users_professional_role_fkey" FOREIGN KEY ("professional_role") REFERENCES "public"."professional_roles"("id");
+
+
+-- ON DELETE CASCADE: deleting the auth.users account removes the linked
+-- profile too — one auth identity owns exactly one users row (see
+-- users_credential_id_key above), so there is no scenario where the profile
+-- should outlive its own credential. Matches this repo's convention for
+-- owned-row FKs (e.g. project_tags, cost_estimate_logs, cost_items all use
+-- ON DELETE CASCADE for the same reason).
+ALTER TABLE ONLY "public"."users"
+    ADD CONSTRAINT "users_credential_id_fkey" FOREIGN KEY ("credential_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
