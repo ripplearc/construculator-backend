@@ -62,12 +62,15 @@ Database backend for **Construculator** — a construction cost estimation platf
 
 > **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` for every clone of
 > this repo — it's baked into the tracked config, not something set per checkout, so it does not by
-> itself tell a dedicated E2E checkout apart from an ordinary dev one like this. What actually
-> protects this checkout: `construculator-app`'s `scripts/e2e/reset_env.sh` and
-> `scripts/e2e/stop_env.sh --purge`, whose destructive commands (`supabase db reset`, `supabase
-> stop --no-backup`) run against whatever checkout they're pointed at, now refuse to run unless the
-> caller sets `E2E_BACKEND_DIR` explicitly — leaving it at its default, which resolves to a sibling
-> directory literally named `construculator-backend`, is no longer enough. So as long as nothing
+> itself tell a dedicated E2E checkout apart from an ordinary dev one like this. `construculator-app`'s
+> `scripts/e2e/reset_env.sh` and `scripts/e2e/stop_env.sh --purge` do also compare the resolved
+> checkout's `project_id` against `construculator-backend-e2e`, but that only catches a checkout
+> from before the CA-991 rename — it's not what keeps these scripts off your dev checkout today.
+> What actually protects this checkout: those same scripts, whose destructive commands (`supabase
+> db reset`, `supabase stop --no-backup`) run against whatever checkout they're pointed at, now
+> refuse to run unless the caller sets `E2E_BACKEND_DIR` explicitly — leaving it at its default,
+> which resolves to a sibling directory literally named `construculator-backend`, is no longer
+> enough. So as long as nothing
 > points `E2E_BACKEND_DIR` at this checkout explicitly, those scripts refuse to run against it,
 > unless `E2E_ALLOW_SHARED_BACKEND=1` explicitly opts into sharing it anyway. Still use two
 > checkouts if you want both a dedicated E2E stack and everyday dev — one for everyday dev (any
