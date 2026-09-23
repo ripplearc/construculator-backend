@@ -214,3 +214,16 @@ CREATE TYPE "public"."consent_action_enum" AS ENUM (
 
 
 ALTER TYPE "public"."consent_action_enum" OWNER TO "postgres";
+
+
+-- Equipment pricing strategy for a your_rates row. Values are the wire
+-- contract with the Flutter EquipmentPricingMethod enum's .name output
+-- (cost_item_entity.dart) -- not a design choice made here.
+
+CREATE TYPE "public"."equipment_pricing_method_enum" AS ENUM (
+    'day',
+    'job'
+);
+
+
+ALTER TYPE "public"."equipment_pricing_method_enum" OWNER TO "postgres";

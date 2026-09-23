@@ -140,3 +140,29 @@ streams:
       FROM cost_estimates
       WHERE project_id IN (SELECT id FROM cost_estimate_projects)
         AND deleted_at IS NULL
+
+  # ── 7. YOUR RATES (CA-1145) ─────────────────────────────────────
+  # The contractor's personal saved-rate book (Decision 37: per company,
+  # same table Decision 5 requires; Decision 55: entries are grouped by
+  # (company_id, category, item_name) and disambiguated by entry_label).
+  #
+  # This predicate IS load-bearing, the same way user_consents' is.
+  # your_rates_select_policy is USING (jwt_user_is_company_member(company_id)),
+  # which checks EXISTS (... company_users WHERE company_id = target AND
+  # user_id = jwt_internal_user_id()) (schemas/_shared/01_functions.sql).
+  # PowerSync bypasses RLS, so this CTE has to reimplement that exact
+  # membership check itself -- otherwise a member of one company would
+  # receive another company's rates.
+  user_rates:
+    auto_subscribe: false  # on-demand, mirrors user_cost_estimates: avoid evaluating this join on every connection startup for a feature (equipment/material/labor costing) not every session touches
+    with:
+      accessible_companies: |
+        SELECT company_id AS id
+        FROM company_users
+        WHERE user_id = auth.parameter('$.app_metadata.internal_user_id')
+    query: |
+      SELECT id, company_id, category, item_name, rate_amount, rate_currency,
+             unit, equipment_method, entry_label, saved_at,
+             created_at, updated_at
+      FROM your_rates
+      WHERE company_id IN (SELECT id FROM accessible_companies)
