@@ -83,6 +83,33 @@ CREATE TYPE "public"."labor_calc_method_enum" AS ENUM (
 ALTER TYPE "public"."labor_calc_method_enum" OWNER TO "postgres";
 
 
+-- equipment_pricing_method_enum ('day'/'job') is defined alongside
+-- CA-1145's your_rates table (PR #57), which needs it first for
+-- your_rates.equipment_method — reused here by cost_items.pricing_method
+-- rather than redeclared, since it's the same EquipmentPricingMethod
+-- Dart enum both tables store.
+
+
+CREATE TYPE "public"."delivery_fee_status_enum" AS ENUM (
+    'unset',
+    'estimated',
+    'confirmed'
+);
+
+
+ALTER TYPE "public"."delivery_fee_status_enum" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."rate_status_enum" AS ENUM (
+    'sample_rate_unverified',
+    'own_rate_confirmed',
+    'missing'
+);
+
+
+ALTER TYPE "public"."rate_status_enum" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."markup_type_enum" AS ENUM (
     'overall',
     'granular'

@@ -1,5 +1,5 @@
 begin;
-select plan(11);
+select plan(26);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -9,6 +9,18 @@ SELECT has_column('public', 'cost_items', 'item_type', 'cost_items.item_type col
 SELECT has_column('public', 'cost_items', 'created_at', 'cost_items.created_at column exists');
 SELECT has_column('public', 'cost_items', 'deleted_at', 'cost_items.deleted_at column exists');
 SELECT col_type_is('public', 'cost_items', 'deleted_at', 'timestamp with time zone', 'cost_items.deleted_at is timestamp');
+
+-- CA-1156: Equipment v2 columns
+SELECT has_column('public', 'cost_items', 'pricing_method', 'cost_items.pricing_method column exists');
+SELECT col_type_is('public', 'cost_items', 'pricing_method', 'equipment_pricing_method_enum', 'cost_items.pricing_method is equipment_pricing_method_enum');
+SELECT has_column('public', 'cost_items', 'duration', 'cost_items.duration column exists');
+SELECT has_column('public', 'cost_items', 'daily_rate', 'cost_items.daily_rate column exists');
+SELECT has_column('public', 'cost_items', 'job_amount', 'cost_items.job_amount column exists');
+SELECT has_column('public', 'cost_items', 'delivery_fee', 'cost_items.delivery_fee column exists');
+SELECT has_column('public', 'cost_items', 'delivery_fee_status', 'cost_items.delivery_fee_status column exists');
+SELECT col_type_is('public', 'cost_items', 'delivery_fee_status', 'delivery_fee_status_enum', 'cost_items.delivery_fee_status is delivery_fee_status_enum');
+SELECT has_column('public', 'cost_items', 'rate_status', 'cost_items.rate_status column exists');
+SELECT col_type_is('public', 'cost_items', 'rate_status', 'rate_status_enum', 'cost_items.rate_status is rate_status_enum');
 
 DO $$
 DECLARE
@@ -53,6 +65,44 @@ DELETE FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440001';
 SELECT isnt_empty(
   $$ SELECT * FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440001' AND deleted_at IS NOT NULL $$,
   'Row should still exist in table with deleted_at set'
+);
+
+-- CA-1156: day-priced equipment item round-trips its pricing fields
+INSERT INTO cost_items (
+  id, estimate_id, item_type, item_name, pricing_method, duration, daily_rate,
+  delivery_fee, delivery_fee_status, rate_status, calculation, item_total_cost, currency
+) VALUES (
+  'c50e8400-e29b-41d4-a716-446655440002', 'a50e8400-e29b-41d4-a716-446655440098', 'equipment',
+  'Mini Excavator', 'day', 5.0, 145.00, 85.00, 'confirmed', 'own_rate_confirmed', '{}', 810.00, 'USD'
+);
+
+SELECT is(
+  (SELECT pricing_method::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440002'),
+  'day',
+  'Equipment item round-trips pricing_method'
+);
+
+SELECT is(
+  (SELECT daily_rate FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440002'),
+  145.00::numeric(18,4),
+  'Equipment item round-trips daily_rate'
+);
+
+SELECT is(
+  (SELECT delivery_fee_status::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440002'),
+  'confirmed',
+  'Equipment item round-trips delivery_fee_status'
+);
+
+SELECT is(
+  (SELECT rate_status::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440002'),
+  'own_rate_confirmed',
+  'Equipment item round-trips rate_status'
+);
+
+SELECT isnt_empty(
+  $$ SELECT * FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440001'::uuid AND job_amount IS NULL AND pricing_method IS NULL $$,
+  'A material item leaves the equipment-only columns NULL'
 );
 
 select * from finish();

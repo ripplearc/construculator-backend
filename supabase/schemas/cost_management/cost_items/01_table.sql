@@ -21,6 +21,13 @@ CREATE TABLE IF NOT EXISTS "public"."cost_items" (
     "labor_unit_type" character varying(50),
     "labor_unit_value" numeric(18,4),
     "crew_size" integer,
+    "pricing_method" "public"."equipment_pricing_method_enum",
+    "duration" numeric(10,2),
+    "daily_rate" numeric(18,4),
+    "job_amount" numeric(18,4),
+    "delivery_fee" numeric(18,4),
+    "delivery_fee_status" "public"."delivery_fee_status_enum",
+    "rate_status" "public"."rate_status_enum",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "deleted_at" timestamp with time zone

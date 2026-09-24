@@ -33,6 +33,15 @@ The `cost_items` table stores individual line items within cost estimates. Each 
 - `labor_unit_value` - Value per custom unit (decimal 18,4)
 - `crew_size` - Number of workers
 
+### Equipment-Specific Fields
+- `pricing_method` - Enum: 'day' or 'job'
+- `duration` - Number of days for day-priced equipment (decimal 10,2)
+- `daily_rate` - Rate per day for day-priced equipment (decimal 18,4)
+- `job_amount` - Flat amount for job-priced equipment (decimal 18,4)
+- `delivery_fee` - Delivery fee; NULL means unquoted (decimal 18,4)
+- `delivery_fee_status` - Enum: 'unset', 'estimated', or 'confirmed'
+- `rate_status` - Enum: 'sample_rate_unverified', 'own_rate_confirmed', or 'missing'
+
 ### Metadata
 - `created_at` - Creation timestamp
 - `updated_at` - Last update timestamp
@@ -54,8 +63,10 @@ Three types of cost items are supported:
 - May have `crew_size` for multiple workers
 
 **Equipment**:
-- Machinery/tool costs
-- Uses: `unit_price`, `quantity`, `unit_measurement`
+- Machinery/tool costs, priced either by the day or as a flat job amount
+- Day pricing uses: `duration`, `daily_rate`
+- Job pricing uses: `job_amount`
+- Optional: `delivery_fee` (with `delivery_fee_status`), `rate_status`
 
 ### 2. Soft Delete
 - Cost items are **never hard deleted**
@@ -137,7 +148,7 @@ Users with access to a cost estimate can:
 
 3. `trigger_log_cost_item_edited` - AFTER UPDATE
    - Logs field changes when any tracked field is modified
-   - Tracks 17 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, and all labor fields
+   - Tracks 24 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, all labor fields, and all equipment fields
 
 4. `trigger_log_cost_item_removed` - AFTER UPDATE
    - Logs removal activity when item is soft deleted
@@ -213,6 +224,37 @@ INSERT INTO cost_items (
   2,
   '{"formula": "labor_hours * unit_price * crew_size", "breakdown": {"hours": 40, "rate": 45, "crew": 2}}'::jsonb,
   3600.00,
+  'USD'
+);
+```
+
+### Creating an Equipment Item (Day Pricing)
+```sql
+INSERT INTO cost_items (
+  estimate_id,
+  item_type,
+  item_name,
+  pricing_method,
+  duration,
+  daily_rate,
+  delivery_fee,
+  delivery_fee_status,
+  rate_status,
+  calculation,
+  item_total_cost,
+  currency
+) VALUES (
+  'estimate-uuid',
+  'equipment',
+  'Mini Excavator',
+  'day',
+  5.0,
+  145.00,
+  85.00,
+  'confirmed',
+  'own_rate_confirmed',
+  '{"formula": "duration * daily_rate + delivery_fee", "breakdown": {"duration": 5, "daily_rate": 145, "delivery_fee": 85}}'::jsonb,
+  810.00,
   'USD'
 );
 ```

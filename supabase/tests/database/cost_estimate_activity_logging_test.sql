@@ -3,7 +3,7 @@
 -- Uses pgTAP framework for comprehensive testing
 
 begin;
-select plan(45);
+select plan(48);
 
 DO $$
 DECLARE
@@ -378,6 +378,53 @@ SELECT is(
   (SELECT (details->'editedFields'->'unit_price'->>'newValue')::numeric FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' LIMIT 1),
   150.00,
   'Cost item edited details contains new unit_price'
+);
+
+-- =============================================================
+-- Test 9b: Editing only an equipment-specific field still logs
+-- (regression coverage for CA-1156's trigger_log_cost_item_edited
+-- WHEN-clause extension)
+-- =============================================================
+DO $$
+BEGIN
+  PERFORM set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","app_metadata":{"internal_user_id":"11111111-1111-1111-1111-111111111111"}}', true);
+  INSERT INTO cost_items (
+    id, estimate_id, item_name, item_type, pricing_method, duration, daily_rate,
+    calculation, item_total_cost, currency
+  ) VALUES (
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee'::uuid,
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid,
+    'Mini Excavator',
+    'equipment',
+    'day',
+    5.0,
+    145.00,
+    '{}'::jsonb,
+    725.00,
+    'USD'
+  );
+
+  UPDATE cost_items
+  SET daily_rate = 160.00
+  WHERE id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+END $$;
+
+SELECT is(
+  (SELECT COUNT(*) FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' AND description = 'Cost item edited: Mini Excavator'),
+  1::bigint,
+  'Editing only daily_rate logs a cost_item_edited entry'
+);
+
+SELECT is(
+  (SELECT (details->'editedFields'->'daily_rate'->>'oldValue')::numeric FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' AND description = 'Cost item edited: Mini Excavator' LIMIT 1),
+  145.00,
+  'Cost item edited details contains old daily_rate'
+);
+
+SELECT is(
+  (SELECT (details->'editedFields'->'daily_rate'->>'newValue')::numeric FROM cost_estimate_logs WHERE estimate_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND activity = 'cost_item_edited' AND description = 'Cost item edited: Mini Excavator' LIMIT 1),
+  160.00,
+  'Cost item edited details contains new daily_rate'
 );
 
 -- =============================================================

@@ -40,7 +40,14 @@ WHEN (
     OLD.labor_hours IS DISTINCT FROM NEW.labor_hours OR
     OLD.labor_unit_type IS DISTINCT FROM NEW.labor_unit_type OR
     OLD.labor_unit_value IS DISTINCT FROM NEW.labor_unit_value OR
-    OLD.crew_size IS DISTINCT FROM NEW.crew_size
+    OLD.crew_size IS DISTINCT FROM NEW.crew_size OR
+    OLD.pricing_method IS DISTINCT FROM NEW.pricing_method OR
+    OLD.duration IS DISTINCT FROM NEW.duration OR
+    OLD.daily_rate IS DISTINCT FROM NEW.daily_rate OR
+    OLD.job_amount IS DISTINCT FROM NEW.job_amount OR
+    OLD.delivery_fee IS DISTINCT FROM NEW.delivery_fee OR
+    OLD.delivery_fee_status IS DISTINCT FROM NEW.delivery_fee_status OR
+    OLD.rate_status IS DISTINCT FROM NEW.rate_status
   )
 )
 EXECUTE FUNCTION "public"."log_cost_item_edited"();
