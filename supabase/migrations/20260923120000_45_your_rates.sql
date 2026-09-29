@@ -19,12 +19,23 @@
 -- helper in supabase/schemas/_shared/01_functions.sql — keep them in step.
 -- https://ripplearc.youtrack.cloud/issue/CA-1145
 
-CREATE TYPE "public"."equipment_pricing_method_enum" AS ENUM (
-    'day',
-    'job'
-);
+-- equipment_pricing_method_enum is created conditionally: CA-1156's PR #58
+-- (equipment v2 cost_items columns) also defines this exact type
+-- ('day'/'job', for the same EquipmentPricingMethod Dart enum) for its own
+-- pricing_method column. Whichever of the two PRs merges first creates it;
+-- the other must not fail by trying to create it again.
 
-ALTER TYPE "public"."equipment_pricing_method_enum" OWNER TO "postgres";
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'equipment_pricing_method_enum') THEN
+    CREATE TYPE "public"."equipment_pricing_method_enum" AS ENUM (
+        'day',
+        'job'
+    );
+    ALTER TYPE "public"."equipment_pricing_method_enum" OWNER TO "postgres";
+  END IF;
+END
+$$;
 
 -- RLS helper: is the caller a member (any role) of the given company?
 --
