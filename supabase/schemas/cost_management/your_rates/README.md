@@ -69,15 +69,18 @@ Saving an entry:
 This branching logic lives in the Flutter repository (`YourRatesRepository`,
 a separate PR) — it is query-then-decide application logic, not something
 the database can express as a single constraint. What this schema provides
-is the safety net beneath it: `your_rates_company_category_item_label_idx`
-(see `02_indexes.sql`), a unique index on
-`(company_id, category, item_name, COALESCE(entry_label, ''))`. A plain
+is the safety net beneath it: `your_rates_company_category_item_label_key`
+(see `01_table.sql`), a `UNIQUE NULLS NOT DISTINCT` constraint on
+`(company_id, category, item_name, entry_label)`. A plain
 `UNIQUE (company_id, category, item_name, entry_label)` would **not** catch
 two `NULL`-labeled rows in the same grouping — Postgres treats `NULL <>
-NULL` for uniqueness — so `entry_label` is normalized through `COALESCE`
-first. The same index also serves as the grouping lookup index and is a
+NULL` for uniqueness — `NULLS NOT DISTINCT` (Postgres 15+) makes two `NULL`s
+count as equal for this constraint instead. The same constraint also serves
+as the grouping lookup index and, being a real column-list constraint rather
+than an expression index, is a valid
 `upsert(onConflict: 'company_id,category,item_name,entry_label')` target for
-the "exact same label" update-in-place case.
+the "exact same label" update-in-place case — the app does not use upsert
+today, but this keeps the option open without a schema change.
 
 ### Design-doc note: no override / default-price columns
 
@@ -93,11 +96,13 @@ building it.
 ## Indexes
 
 - `your_rates_pkey` - Primary key on `id`
-- `your_rates_company_category_item_label_idx` - Unique, on
-  `(company_id, category, item_name, COALESCE(entry_label, ''))`. Enforces
+- `your_rates_company_category_item_label_key` - `UNIQUE NULLS NOT DISTINCT`
+  constraint on `(company_id, category, item_name, entry_label)`. Enforces
   the collision constraint above and doubles as the grouping lookup index —
   its leading three columns satisfy `(company_id, category, item_name)`
-  lookups without a separate, redundant index.
+  lookups without a separate, redundant index. Being a real constraint, it
+  also backs each of Postgres' automatic unique index and an
+  `onConflict: 'company_id,category,item_name,entry_label'` upsert target.
 
 ## RLS Policies
 
@@ -116,12 +121,17 @@ role. The ticket does not gate "Your rates" access by role.
   withheld-capability precedent: with no policy, DELETE succeeds having
   changed zero rows rather than erroring.
 
-Reads issue an unscoped-looking `SELECT` from the Flutter repository;
-company scoping is enforced entirely by RLS (`search`/`getByItemName` take
-no explicit `companyId` parameter). `save(entry)` carries `company_id`
-explicitly, since the caller has to specify which company owns the row
-being written; the INSERT policy's `WITH CHECK` verifies the caller is
-actually a member of that company.
+**RLS alone does not scope a read to one company.** `company_users` has a
+unique index on `(user_id, company_id)` (migration 10), so one user can
+belong to more than one company. For such a user, the SELECT policy's
+`jwt_user_is_company_member` check returns true for every company they
+belong to, so an unscoped `SELECT` returns the rows of **every** company
+they are a member of, not just one. The Flutter repository (`search`,
+`getByItemName`) therefore passes an explicit `companyId` on every read and
+filters on it — that filter, not RLS, is what actually scopes a read to one
+company. `save(entry)` carries `company_id` explicitly for the same reason,
+and the INSERT/UPDATE policies' `WITH CHECK` verifies the caller is actually
+a member of whichever company the row names.
 
 ## PowerSync
 

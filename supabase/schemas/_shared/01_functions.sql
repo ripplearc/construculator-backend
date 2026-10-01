@@ -70,3 +70,10 @@ $$;
 
 ALTER FUNCTION "public"."jwt_user_is_company_member"("uuid") OWNER TO "postgres";
 COMMENT ON FUNCTION "public"."jwt_user_is_company_member"("uuid") IS 'Shared RLS helper. True when the caller (per jwt_internal_user_id()) belongs to target_company_id via company_users, regardless of role. NULL from jwt_internal_user_id() (claim absent) never matches any company_users.user_id, so an absent claim denies rather than leaks.';
+
+-- New functions in public get EXECUTE for PUBLIC by default, which would
+-- let anon call this over RPC. The answer only concerns the caller, and
+-- anon always gets false, but RLS policies run as authenticated and need
+-- EXECUTE, so only PUBLIC/anon are revoked here.
+REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM "PUBLIC";
+REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM "anon";

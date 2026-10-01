@@ -1,9 +1,9 @@
 BEGIN;
 
 -- Tests for CA-1145: your_rates, the contractor's personal saved-rate book.
--- Covers table/PK/FK/index shape, the expression unique index that enforces
--- the (company_id, category, item_name, entry_label) collision rule from
--- Decision 55 -- including the both-NULL-label case a plain UNIQUE
+-- Covers table/PK/FK shape, the UNIQUE NULLS NOT DISTINCT constraint that
+-- enforces the (company_id, category, item_name, entry_label) collision rule
+-- from Decision 55 -- including the both-NULL-label case a plain UNIQUE
 -- constraint would miss -- RLS scoping across two companies via
 -- jwt_user_is_company_member(), the no-claim denial-by-default case, and the
 -- shared updated_at trigger.
@@ -18,16 +18,21 @@ SELECT has_table('public', 'your_rates', 'your_rates table should exist');
 SELECT has_pk('public', 'your_rates', 'your_rates should have a primary key');
 SELECT col_is_fk('public', 'your_rates', 'company_id', 'your_rates.company_id is a FK to companies');
 
-SELECT has_index(
-  'public', 'your_rates', 'your_rates_company_category_item_label_idx',
-  'The (company_id, category, item_name, COALESCE(entry_label, '''')) collision index exists'
+SELECT ok(
+  EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'your_rates_company_category_item_label_key'
+      AND conrelid = 'public.your_rates'::regclass
+      AND contype = 'u'
+  ),
+  'your_rates has a UNIQUE constraint on (company_id, category, item_name, entry_label)'
 );
 
 SELECT is(
-  (SELECT indisunique FROM pg_index
-     WHERE indexrelid = 'public.your_rates_company_category_item_label_idx'::regclass),
+  (SELECT indnullsnotdistinct FROM pg_index
+     WHERE indexrelid = 'public.your_rates_company_category_item_label_key'::regclass),
   true,
-  'The collision index is unique, not just a lookup index'
+  'The collision constraint treats NULLs as equal (NULLS NOT DISTINCT), catching the both-NULL-label case'
 );
 
 SELECT is(
@@ -118,7 +123,7 @@ SELECT throws_ok(
     VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Excavator', 275.0000, 'USD', now())$$,
   '23505',
   NULL,
-  'A second unlabeled save into the same grouping is rejected (both entry_label NULL collide via COALESCE)'
+  'A second unlabeled save into the same grouping is rejected (both entry_label NULL collide via NULLS NOT DISTINCT)'
 );
 
 SELECT lives_ok(

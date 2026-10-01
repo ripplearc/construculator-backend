@@ -14,8 +14,8 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     "equipment_method" "public"."equipment_pricing_method_enum",
     -- Distinguishes multiple entries in the same (company_id, category,
     -- item_name) grouping (Decision 55). NULL is a valid, comparable label
-    -- for collision purposes -- see the expression unique index in
-    -- 02_indexes.sql.
+    -- for collision purposes -- see the UNIQUE NULLS NOT DISTINCT constraint
+    -- below.
     "entry_label" character varying(100),
     -- Client-supplied, like user_consents.recorded_at: this is domain time
     -- (when the contractor saved the rate), not row-modification time, so it
@@ -42,3 +42,16 @@ ALTER TABLE ONLY "public"."your_rates"
 
 ALTER TABLE ONLY "public"."your_rates"
     ADD CONSTRAINT "your_rates_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id");
+
+
+-- Collision constraint (Decision 55): two rows can never share the same
+-- (company_id, category, item_name, entry_label) grouping+label, including
+-- when both entry_labels are NULL. NULLS NOT DISTINCT (Postgres 15+) makes
+-- two NULLs count as equal for this constraint, unlike a plain UNIQUE, which
+-- treats NULL <> NULL. Unlike an expression index on COALESCE(entry_label,
+-- ''), this is a real column-list unique constraint, so it can be an
+-- upsert(onConflict: ...) target with plain column names, and the leading
+-- three columns still serve the group lookup.
+ALTER TABLE ONLY "public"."your_rates"
+    ADD CONSTRAINT "your_rates_company_category_item_label_key"
+    UNIQUE NULLS NOT DISTINCT ("company_id", "category", "item_name", "entry_label");
