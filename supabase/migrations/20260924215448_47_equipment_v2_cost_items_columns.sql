@@ -38,7 +38,7 @@
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'equipment_pricing_method_enum') THEN
+  IF to_regtype('public.equipment_pricing_method_enum') IS NULL THEN
     CREATE TYPE "public"."equipment_pricing_method_enum" AS ENUM (
         'day',
         'job'

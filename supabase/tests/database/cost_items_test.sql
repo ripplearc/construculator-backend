@@ -1,5 +1,5 @@
 begin;
-select plan(26);
+select plan(33);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -21,6 +21,20 @@ SELECT has_column('public', 'cost_items', 'delivery_fee_status', 'cost_items.del
 SELECT col_type_is('public', 'cost_items', 'delivery_fee_status', 'delivery_fee_status_enum', 'cost_items.delivery_fee_status is delivery_fee_status_enum');
 SELECT has_column('public', 'cost_items', 'rate_status', 'cost_items.rate_status column exists');
 SELECT col_type_is('public', 'cost_items', 'rate_status', 'rate_status_enum', 'cost_items.rate_status is rate_status_enum');
+
+-- The enum values, and the numeric columns' precision/scale, are the wire
+-- contract with the app (app#649): a renamed label or a widened/narrowed
+-- numeric column would still pass every check above without this.
+SELECT enum_has_labels('public', 'equipment_pricing_method_enum', ARRAY['day', 'job']);
+SELECT enum_has_labels('public', 'delivery_fee_status_enum', ARRAY['unset', 'estimated', 'confirmed']);
+SELECT enum_has_labels(
+  'public', 'rate_status_enum',
+  ARRAY['sample_rate_unverified', 'own_rate_confirmed', 'missing']
+);
+SELECT col_type_is('public', 'cost_items', 'duration', 'numeric(10,2)', 'cost_items.duration is numeric(10,2)');
+SELECT col_type_is('public', 'cost_items', 'daily_rate', 'numeric(18,4)', 'cost_items.daily_rate is numeric(18,4)');
+SELECT col_type_is('public', 'cost_items', 'job_amount', 'numeric(18,4)', 'cost_items.job_amount is numeric(18,4)');
+SELECT col_type_is('public', 'cost_items', 'delivery_fee', 'numeric(18,4)', 'cost_items.delivery_fee is numeric(18,4)');
 
 DO $$
 DECLARE
