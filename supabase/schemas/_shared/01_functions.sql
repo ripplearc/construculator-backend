@@ -75,5 +75,5 @@ COMMENT ON FUNCTION "public"."jwt_user_is_company_member"("uuid") IS 'Shared RLS
 -- let anon call this over RPC. The answer only concerns the caller, and
 -- anon always gets false, but RLS policies run as authenticated and need
 -- EXECUTE, so only PUBLIC/anon are revoked here.
-REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM "PUBLIC";
+REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM "anon";

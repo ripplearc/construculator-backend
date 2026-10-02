@@ -100,8 +100,8 @@ building it.
   constraint on `(company_id, category, item_name, entry_label)`. Enforces
   the collision constraint above and doubles as the grouping lookup index —
   its leading three columns satisfy `(company_id, category, item_name)`
-  lookups without a separate, redundant index. Being a real constraint, it
-  also backs each of Postgres' automatic unique index and an
+  lookups without a separate, redundant index. Postgres builds a unique
+  index for it automatically, and it is a valid
   `onConflict: 'company_id,category,item_name,entry_label'` upsert target.
 
 ## RLS Policies
@@ -161,7 +161,7 @@ evaluated against replicated state, the same role `role_permissions` /
 ## Testing
 
 See `supabase/tests/database/your_rates_test.sql`:
-table/PK/FK/index shape, the expression unique index's collision behavior
+table/PK/FK/index shape, the unique constraint's collision behavior
 (including the both-`NULL`-label case), RLS SELECT/INSERT/UPDATE scoping
 across two companies, the no-claim denial-by-default case, and the
 `updated_at` trigger.

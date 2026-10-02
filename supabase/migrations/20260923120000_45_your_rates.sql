@@ -22,8 +22,10 @@
 -- equipment_pricing_method_enum is created conditionally: CA-1156's PR #58
 -- (equipment v2 cost_items columns) also defines this exact type
 -- ('day'/'job', for the same EquipmentPricingMethod Dart enum) for its own
--- pricing_method column. Whichever of the two PRs merges first creates it;
--- the other must not fail by trying to create it again.
+-- pricing_method column. This migration (45) creates it first: it predates
+-- be#58's migration (47) by file date, so be#58 must merge after this one.
+-- The guard here makes a rerun safe if the two are ever applied out of
+-- their normal order.
 
 DO $$
 BEGIN
@@ -77,7 +79,7 @@ COMMENT ON FUNCTION "public"."jwt_user_is_company_member"("uuid") IS 'Shared RLS
 -- let anon call this over RPC. The answer only concerns the caller, and
 -- anon always gets false, but RLS policies run as authenticated and need
 -- EXECUTE, so only PUBLIC/anon are revoked here.
-REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM "PUBLIC";
+REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION "public"."jwt_user_is_company_member"("uuid") FROM "anon";
 
 CREATE TABLE IF NOT EXISTS "public"."your_rates" (
