@@ -1,5 +1,5 @@
 begin;
-select plan(33);
+select plan(34);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -17,8 +17,6 @@ SELECT has_column('public', 'cost_items', 'duration', 'cost_items.duration colum
 SELECT has_column('public', 'cost_items', 'daily_rate', 'cost_items.daily_rate column exists');
 SELECT has_column('public', 'cost_items', 'job_amount', 'cost_items.job_amount column exists');
 SELECT has_column('public', 'cost_items', 'delivery_fee', 'cost_items.delivery_fee column exists');
-SELECT has_column('public', 'cost_items', 'delivery_fee_status', 'cost_items.delivery_fee_status column exists');
-SELECT col_type_is('public', 'cost_items', 'delivery_fee_status', 'delivery_fee_status_enum', 'cost_items.delivery_fee_status is delivery_fee_status_enum');
 SELECT has_column('public', 'cost_items', 'rate_status', 'cost_items.rate_status column exists');
 SELECT col_type_is('public', 'cost_items', 'rate_status', 'rate_status_enum', 'cost_items.rate_status is rate_status_enum');
 
@@ -26,10 +24,9 @@ SELECT col_type_is('public', 'cost_items', 'rate_status', 'rate_status_enum', 'c
 -- contract with the app (app#649): a renamed label or a widened/narrowed
 -- numeric column would still pass every check above without this.
 SELECT enum_has_labels('public', 'equipment_pricing_method_enum', ARRAY['day', 'job']);
-SELECT enum_has_labels('public', 'delivery_fee_status_enum', ARRAY['unset', 'estimated', 'confirmed']);
 SELECT enum_has_labels(
   'public', 'rate_status_enum',
-  ARRAY['sample_rate_unverified', 'own_rate_confirmed', 'missing']
+  ARRAY['sample_rate_unverified', 'own_rate_unconfirmed', 'own_rate_confirmed', 'missing']
 );
 SELECT col_type_is('public', 'cost_items', 'duration', 'numeric(10,2)', 'cost_items.duration is numeric(10,2)');
 SELECT col_type_is('public', 'cost_items', 'daily_rate', 'numeric(18,4)', 'cost_items.daily_rate is numeric(18,4)');
@@ -84,10 +81,10 @@ SELECT isnt_empty(
 -- CA-1156: day-priced equipment item round-trips its pricing fields
 INSERT INTO cost_items (
   id, estimate_id, item_type, item_name, pricing_method, duration, daily_rate,
-  delivery_fee, delivery_fee_status, rate_status, calculation, item_total_cost, currency
+  delivery_fee, rate_status, calculation, item_total_cost, currency
 ) VALUES (
   'c50e8400-e29b-41d4-a716-446655440002', 'a50e8400-e29b-41d4-a716-446655440098', 'equipment',
-  'Mini Excavator', 'day', 5.0, 145.00, 85.00, 'confirmed', 'own_rate_confirmed', '{}', 810.00, 'USD'
+  'Mini Excavator', 'day', 5.0, 145.00, 85.00, 'own_rate_confirmed', '{}', 810.00, 'USD'
 );
 
 SELECT is(
@@ -103,12 +100,6 @@ SELECT is(
 );
 
 SELECT is(
-  (SELECT delivery_fee_status::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440002'),
-  'confirmed',
-  'Equipment item round-trips delivery_fee_status'
-);
-
-SELECT is(
   (SELECT rate_status::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440002'),
   'own_rate_confirmed',
   'Equipment item round-trips rate_status'
@@ -117,6 +108,40 @@ SELECT is(
 SELECT isnt_empty(
   $$ SELECT * FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440001'::uuid AND job_amount IS NULL AND pricing_method IS NULL $$,
   'A material item leaves the equipment-only columns NULL'
+);
+
+-- CA-1156: cost_items_duration_half_day_check only allows whole/half days
+SELECT lives_ok(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, duration, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'equipment', 'Half day rental', 0.5, '{}', 10.00, 'USD') $$,
+  'duration = 0.5 is allowed'
+);
+
+SELECT lives_ok(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, duration, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'equipment', 'A day and a half rental', 1.5, '{}', 10.00, 'USD') $$,
+  'duration = 1.5 is allowed'
+);
+
+SELECT throws_like(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, duration, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'equipment', 'Third-of-a-day rental', 0.3, '{}', 10.00, 'USD') $$,
+  '%cost_items_duration_half_day_check%',
+  'duration = 0.3 violates the half-day check'
+);
+
+SELECT throws_like(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, duration, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'equipment', 'Zero-day rental', 0, '{}', 10.00, 'USD') $$,
+  '%cost_items_duration_half_day_check%',
+  'duration = 0 violates the half-day check'
+);
+
+SELECT throws_like(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, duration, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'equipment', 'Negative-day rental', -1, '{}', 10.00, 'USD') $$,
+  '%cost_items_duration_half_day_check%',
+  'duration = -1 violates the half-day check'
 );
 
 select * from finish();

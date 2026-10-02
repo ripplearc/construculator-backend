@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS "public"."cost_items" (
     "daily_rate" numeric(18,4),
     "job_amount" numeric(18,4),
     "delivery_fee" numeric(18,4),
-    "delivery_fee_status" "public"."delivery_fee_status_enum",
     "rate_status" "public"."rate_status_enum",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
@@ -47,3 +46,10 @@ ALTER TABLE ONLY "public"."cost_items"
 
 ALTER TABLE ONLY "public"."cost_items"
     ADD CONSTRAINT "cost_items_estimate_id_fkey" FOREIGN KEY ("estimate_id") REFERENCES "public"."cost_estimates"("id") ON DELETE CASCADE;
+
+
+-- Check Constraints
+
+ALTER TABLE ONLY "public"."cost_items"
+    ADD CONSTRAINT "cost_items_duration_half_day_check"
+      CHECK ("duration" IS NULL OR ("duration" > 0 AND "duration" * 2 = trunc("duration" * 2)));

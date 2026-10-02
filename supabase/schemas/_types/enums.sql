@@ -90,18 +90,9 @@ ALTER TYPE "public"."labor_calc_method_enum" OWNER TO "postgres";
 -- Dart enum both tables store.
 
 
-CREATE TYPE "public"."delivery_fee_status_enum" AS ENUM (
-    'unset',
-    'estimated',
-    'confirmed'
-);
-
-
-ALTER TYPE "public"."delivery_fee_status_enum" OWNER TO "postgres";
-
-
 CREATE TYPE "public"."rate_status_enum" AS ENUM (
     'sample_rate_unverified',
+    'own_rate_unconfirmed',
     'own_rate_confirmed',
     'missing'
 );

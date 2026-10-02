@@ -46,7 +46,6 @@ WHEN (
     OLD.daily_rate IS DISTINCT FROM NEW.daily_rate OR
     OLD.job_amount IS DISTINCT FROM NEW.job_amount OR
     OLD.delivery_fee IS DISTINCT FROM NEW.delivery_fee OR
-    OLD.delivery_fee_status IS DISTINCT FROM NEW.delivery_fee_status OR
     OLD.rate_status IS DISTINCT FROM NEW.rate_status
   )
 )

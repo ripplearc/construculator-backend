@@ -2,24 +2,33 @@
 --
 -- CA-1141 (construculator-app PR #649) changed CostItemDto.toJson()/fromJson()
 -- to read/write pricing_method, duration, daily_rate, job_amount,
--- delivery_fee, delivery_fee_status, and rate_status as literal top-level
--- JSON keys on cost_items. None of these columns existed, so submitting any
--- Equipment cost item against the real backend would fail with "Could not
--- find column in schema cache" (or equivalent) once CA-355 wires up
--- submission — not caught earlier because CA-1141-1145's own test suites
--- all run against FakeSupabaseWrapper, which doesn't enforce a real schema.
+-- delivery_fee, and rate_status as literal top-level JSON keys on
+-- cost_items. None of these columns existed, so submitting any Equipment
+-- cost item against the real backend would fail with "Could not find
+-- column in schema cache" (or equivalent) once CA-355 wires up submission —
+-- not caught earlier because CA-1141-1145's own test suites all run against
+-- FakeSupabaseWrapper, which doesn't enforce a real schema.
 --
--- All 7 columns are nullable, matching the existing unit_price/quantity/
+-- All 6 columns are nullable, matching the existing unit_price/quantity/
 -- labor_* pattern for type-specific fields on this shared table — an
 -- Equipment row uses pricing_method/duration/daily_rate/job_amount, a
 -- Material/Labor row leaves them all NULL.
 --
 -- rate_status uses snake_case values (sample_rate_unverified,
--- own_rate_confirmed, missing) — RateStatus.toJson() on the Dart side was
--- fixed in the same CA-1141 branch to emit an explicit snake_case .value
--- instead of the bare (camelCase) enum .name, matching every other enum
--- column in this schema (see LaborCalculationMethodType's own .value
--- field for the established precedent).
+-- own_rate_unconfirmed, own_rate_confirmed, missing) — RateStatus.toJson()
+-- on the Dart side was fixed in the same CA-1141 branch to emit an explicit
+-- snake_case .value instead of the bare (camelCase) enum .name, matching
+-- every other enum column in this schema (see LaborCalculationMethodType's
+-- own .value field for the established precedent). own_rate_unconfirmed
+-- was added per app#650's review (CA-1156 review thread): the bloc sets it
+-- for every typed-but-unsaved rate, distinct from own_rate_confirmed (the
+-- "Save as my rate" case app#667 gates on) — collapsing the two on the app
+-- side would have silently broken that gate.
+--
+-- No status enum exists for delivery_fee: per the Figma "Rate Status"
+-- component (node 66368:185975), only the Waste/rate row carries an
+-- Estimated/Confirmed tag — the Delivery row does not. app#649 confirmed
+-- this and never sends a delivery_fee_status key.
 --
 -- Written by hand rather than via `supabase db diff`: config.toml declares
 -- schema_paths = [], so the CLI has no declared schema to diff against (same
@@ -28,11 +37,10 @@
 -- alongside this migration to keep the declarative schema in sync with
 -- reality once schema_paths is populated.
 --
--- equipment_pricing_method_enum is created conditionally: CA-1145's PR #57
--- (your_rates table) already defines this exact type ('day'/'job', for the
--- same EquipmentPricingMethod Dart enum) for its own equipment_method
--- column. Whichever of the two PRs merges first creates it; the other must
--- not fail by trying to create it again.
+-- equipment_pricing_method_enum is created conditionally: CA-1145 (be#57)
+-- creates this type first (its migration 45 predates this one, 47, by file
+-- date), so this migration must run after it. The guard makes a rerun safe
+-- if the two are ever applied out of their normal order.
 --
 -- https://ripplearc.youtrack.cloud/issue/CA-1156
 
@@ -48,16 +56,9 @@ BEGIN
 END
 $$;
 
-CREATE TYPE "public"."delivery_fee_status_enum" AS ENUM (
-    'unset',
-    'estimated',
-    'confirmed'
-);
-
-ALTER TYPE "public"."delivery_fee_status_enum" OWNER TO "postgres";
-
 CREATE TYPE "public"."rate_status_enum" AS ENUM (
     'sample_rate_unverified',
+    'own_rate_unconfirmed',
     'own_rate_confirmed',
     'missing'
 );
@@ -70,11 +71,12 @@ ALTER TABLE ONLY "public"."cost_items"
     ADD COLUMN "daily_rate" numeric(18,4),
     ADD COLUMN "job_amount" numeric(18,4),
     ADD COLUMN "delivery_fee" numeric(18,4),
-    ADD COLUMN "delivery_fee_status" "public"."delivery_fee_status_enum",
-    ADD COLUMN "rate_status" "public"."rate_status_enum";
+    ADD COLUMN "rate_status" "public"."rate_status_enum",
+    ADD CONSTRAINT "cost_items_duration_half_day_check"
+      CHECK ("duration" IS NULL OR ("duration" > 0 AND "duration" * 2 = trunc("duration" * 2)));
 
 -- Extend trigger_log_cost_item_edited's tracked-columns WHEN clause to
--- cover the 7 new equipment fields, keeping it in sync with the table per
+-- cover the 6 new equipment fields, keeping it in sync with the table per
 -- its own doc comment in schemas/cost_management/cost_items/04_triggers.sql.
 CREATE OR REPLACE TRIGGER "trigger_log_cost_item_edited"
 AFTER UPDATE ON "public"."cost_items"
@@ -104,7 +106,6 @@ WHEN (
     OLD.daily_rate IS DISTINCT FROM NEW.daily_rate OR
     OLD.job_amount IS DISTINCT FROM NEW.job_amount OR
     OLD.delivery_fee IS DISTINCT FROM NEW.delivery_fee OR
-    OLD.delivery_fee_status IS DISTINCT FROM NEW.delivery_fee_status OR
     OLD.rate_status IS DISTINCT FROM NEW.rate_status
   )
 )
