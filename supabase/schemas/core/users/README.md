@@ -328,5 +328,5 @@ See test files:
 - `credential_id -> auth.users(id)` FK (`ON DELETE CASCADE`) added under CA-995, closing the gap where a hand-inserted `users` row could point at a nonexistent auth account
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
-- Personal company trigger and `get_my_company_id()` added in migration `20261004120000_44_personal_company_trigger.sql`
+- Personal company trigger and `get_my_company_id()` added in migration `20261004120000_45_personal_company_trigger.sql`
 - View created in migration `20251218175411_create_user_profile_view.sql`
