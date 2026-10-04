@@ -2,9 +2,22 @@
 --
 -- Written by hand because config.toml declares schema_paths = [], so the CLI
 -- has nothing to diff against.
+-- Also adds the Admin role (same id as the seeder) so the trigger works on a
+-- database that has no seeders.
 -- Mirrors supabase/schemas/core/users/07_personal_company_trigger.sql and the
 -- get_my_company_id() function in supabase/schemas/core/users/03_functions.sql.
 -- https://ripplearc.youtrack.cloud/issue/CA-710
+
+INSERT INTO "public"."roles" ("id", "role_name", "level", "description", "context_type")
+VALUES (
+  'a50e8400-e29b-41d4-a716-446655440001',
+  'Admin',
+  4,
+  'Full control over project including all cost estimations and team management',
+  'project'
+)
+ON CONFLICT ("role_name") DO NOTHING;
+
 
 CREATE OR REPLACE FUNCTION "public"."get_my_company_id"() RETURNS "uuid"
     LANGUAGE "sql" STABLE SECURITY DEFINER

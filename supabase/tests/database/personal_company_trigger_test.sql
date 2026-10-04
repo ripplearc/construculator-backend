@@ -3,7 +3,7 @@ BEGIN;
 -- Tests for CA-710: the AFTER INSERT trigger on users that creates one
 -- personal company and one Admin company_users row, and get_my_company_id().
 
-SELECT plan(27);
+SELECT plan(32);
 
 -- ============================================================
 -- Fixtures
@@ -25,6 +25,9 @@ INSERT INTO auth.users (
    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'cccccccc-0000-0000-0000-000000000003', 'authenticated', 'authenticated',
    'rollback@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+   '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'cccccccc-0000-0000-0000-000000000004', 'authenticated', 'authenticated',
+   'client@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', '');
 
 -- ============================================================
@@ -156,6 +159,48 @@ SELECT is(
 );
 
 ALTER TABLE public.companies DROP CONSTRAINT zz_reject_rollback_probe;
+
+-- ============================================================
+-- Insert as a signed-in client (the app's real path)
+-- ============================================================
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub": "cccccccc-0000-0000-0000-000000000004", "role": "authenticated"}', true);
+
+SELECT lives_ok(
+  $$INSERT INTO public.users (id, credential_id, email, first_name, last_name, professional_role, user_preferences)
+    VALUES ('bbbbbbbb-0000-0000-0000-000000000004', 'cccccccc-0000-0000-0000-000000000004',
+            'client@example.com', 'Client', 'Test', 'aaaaaaaa-0000-0000-0000-000000000001', '{}')$$,
+  'A signed-in client can insert its own users row and the trigger does not fail'
+);
+
+SELECT is(
+  public.get_my_company_id() IS NOT NULL,
+  true,
+  'get_my_company_id() returns a company straight after the client insert'
+);
+
+RESET ROLE;
+
+SELECT is(
+  (SELECT count(*) FROM public.company_users WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000004'),
+  1::bigint,
+  'The client insert created exactly one company_users row'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.company_users cu JOIN public.roles r ON r.id = cu.role_id
+     WHERE cu.user_id = 'bbbbbbbb-0000-0000-0000-000000000004' AND r.role_name = 'Admin'),
+  1::bigint,
+  'That row has the Admin role'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies c JOIN public.company_users cu ON cu.company_id = c.id
+     WHERE cu.user_id = 'bbbbbbbb-0000-0000-0000-000000000004' AND c.name = 'Client''s company'),
+  1::bigint,
+  'Exactly one company was created for the client'
+);
 
 -- ============================================================
 -- Privileges
