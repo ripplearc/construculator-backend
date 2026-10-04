@@ -60,17 +60,24 @@ Database backend for **Construculator** — a construction cost estimation platf
 
 ## Getting Started
 
-> **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` — this checkout's
-> Supabase stack is named for `construculator-app`'s E2E test harness, whose scripts run
-> destructive commands (`supabase db reset`, `supabase stop --no-backup`) against whatever
-> checkout they're pointed at. If you're also using this checkout as the E2E harness's target
-> (`construculator-app`'s `E2E_BACKEND_DIR`, which defaults to a sibling directory named
-> `construculator-backend`), be aware you're sharing one database between your manual work below
-> and those destructive scripts. For a stack that's genuinely yours, keep the E2E harness pointed
-> at a separate clone — renaming `project_id` in this checkout doesn't help, since the harness
-> would then just destroy whatever project the renamed `config.toml` names. Nothing yet enforces
-> the separate-clone requirement structurally; tracked in
-> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007).
+> **Note:** `supabase/config.toml`'s `project_id` is `construculator-backend-e2e` for every clone of
+> this repo — it's baked into the tracked config, not something set per checkout, so it does not by
+> itself tell a dedicated E2E checkout apart from an ordinary dev one like this. `construculator-app`'s
+> `scripts/e2e/reset_env.sh` and `scripts/e2e/stop_env.sh --purge` do also compare the resolved
+> checkout's `project_id` against `construculator-backend-e2e`, but that only catches a checkout
+> from before the CA-991 rename — it's not what keeps these scripts off your dev checkout today.
+> What actually protects this checkout: those same scripts, whose destructive commands (`supabase
+> db reset`, `supabase stop --no-backup`) run against whatever checkout they're pointed at, now
+> refuse to run unless the caller sets `E2E_BACKEND_DIR` explicitly — leaving it at its default,
+> which resolves to a sibling directory literally named `construculator-backend`, is no longer
+> enough. So as long as nothing
+> points `E2E_BACKEND_DIR` at this checkout explicitly, those scripts refuse to run against it,
+> unless `E2E_ALLOW_SHARED_BACKEND=1` explicitly opts into sharing it anyway. Still use two
+> checkouts if you want both a dedicated E2E stack and everyday dev — one for everyday dev (any
+> directory name), and a separate clone dedicated to the E2E harness, with `E2E_BACKEND_DIR`
+> pointed at it explicitly. See
+> [CA-1007](https://ripplearc.youtrack.cloud/issue/CA-1007) for the app-side check that enforces
+> this.
 
 ```bash
 # 1. Make sure you are inside the repo
@@ -436,9 +443,11 @@ When testing signup or password reset, emails are intercepted by **Inbucket** (n
 `100_auth_users.sql` seeds a matching GoTrue credential for the sample `users` row, so `seeder@example.com` is signed-in-ready out of the box on `npx supabase start` / `npx supabase db reset` — no manual Studio steps needed:
 
 - **Email:** `seeder@example.com`
-- **Password:** `e2e-local-only-password`
+- **Password:** `Mypass@1`
 
-This password is fixed and committed to this public repo — it is only ever valid against a local Docker Supabase stack started from this repository, never a hosted environment. `public.users.credential_id` already matches this account's `auth.users.id`, so RLS policies work correctly without any extra linking step.
+This password is fixed and committed to this public repo — it is only ever valid against a local Docker Supabase stack started from this repository, never a hosted environment. It is also shaped to pass the app's own client-side password rules so the CUJ-1 login form accepts it. `public.users.credential_id` already matches this account's `auth.users.id`, so RLS policies work correctly without any extra linking step.
+
+If you already had this account from before this change, run `npx supabase db reset` — re-running the seeders alone will not update an existing account's password.
 
 ---
 

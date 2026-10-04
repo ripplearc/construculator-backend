@@ -57,7 +57,56 @@ streams:
       FROM project_members
       WHERE user_id = auth.parameter('$.app_metadata.internal_user_id')
 
-  # ── 4. COST ESTIMATES ───────────────────────────────────────────
+  # ── 4. PUBLISHED CONSENT VERSIONS ───────────────────────────────
+  # The base table, not the current_consent_versions view, for two reasons.
+  # A sync stream replicates from the WAL of a base table; a view has no
+  # replication identity to follow. And the view's own predicate is
+  # `effective_from <= now()`, which no row change fires — a version
+  # scheduled to go live tomorrow would never enter the stream, because
+  # nothing writes to the table when the clock passes its effective_from.
+  # So the client syncs the full publication history and resolves "currently
+  # in force" itself, in PowerSyncLocalConsentDataSource.fetchPublishedVersion,
+  # applying the same two rules the view applies: effective_from in the past,
+  # highest version wins.
+  #
+  # Unfiltered, matching the consent_versions SELECT policy, which is
+  # USING (true) for authenticated (schemas/consent/consent_versions/03_rls.sql).
+  # PowerSync bypasses Postgres RLS, so an unfiltered query here is not a
+  # relaxation — the terms are the same document for every user, and the
+  # policy scopes nothing for this stream to re-enforce.
+  #
+  # auto_subscribe because the gate reads this before the user has opened any
+  # project, and the table is a handful of rows per consent type.
+  consent_versions:
+    auto_subscribe: true
+    query: |
+      SELECT id, consent_type, version, document_url,
+             effective_from, published_at
+      FROM consent_versions
+
+  # ── 5. THE USER'S OWN CONSENT LOG ───────────────────────────────
+  # Same filter style as my_user: internal_user_id straight off the JWT, no
+  # users-table lookup.
+  #
+  # This predicate IS load-bearing. user_consents_select_policy is
+  # `user_id = jwt_internal_user_id()`, and jwt_internal_user_id() reads
+  # exactly `auth.jwt() -> 'app_metadata' ->> 'internal_user_id'`
+  # (schemas/_shared/01_functions.sql) — the same claim auth.parameter reads
+  # here. Since PowerSync bypasses RLS, this WHERE clause is the only thing
+  # keeping one user's consent history off another user's device.
+  #
+  # Full history, not just the newest row per (user_id, consent_type): the
+  # table is append-only and the client resolves the newest row itself. The
+  # rows are small and bounded by how often one user accepts or withdraws.
+  user_consents:
+    auto_subscribe: true
+    query: |
+      SELECT id, user_id, consent_type, version, action,
+             recorded_at, app_version, platform
+      FROM user_consents
+      WHERE user_id = auth.parameter('$.app_metadata.internal_user_id')
+
+  # ── 6. COST ESTIMATES ───────────────────────────────────────────
   # Gated by the 'get_cost_estimations' permission to mirror the RLS
   # policy in 20260313081637_migrate_cost_estimates_rls_to_jwt.sql.
   # PowerSync bypasses Postgres RLS, so the sync rule MUST enforce

@@ -80,6 +80,20 @@ DECLARE
 BEGIN
   INSERT INTO professional_roles (id, name) VALUES (v_role_id, 'Consent Test Role');
 
+  -- CA-995: users.credential_id now FKs to auth.users(id), so real auth
+  -- accounts have to exist before they can be referenced below.
+  INSERT INTO auth.users (
+    "instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at",
+    "raw_app_meta_data", "raw_user_meta_data", "created_at", "updated_at",
+    "confirmation_token", "recovery_token", "email_change_token_new", "email_change"
+  ) VALUES
+    ('00000000-0000-0000-0000-000000000000', '22222222-2222-2222-2222-222222222222', 'authenticated', 'authenticated',
+     'consent_owner@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', '44444444-4444-4444-4444-444444444444', 'authenticated', 'authenticated',
+     'consent_other@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+     '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', '');
+
   INSERT INTO users (id, credential_id, email, first_name, last_name, professional_role, created_at, user_status, user_preferences, country_code)
   VALUES
     ('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222',
