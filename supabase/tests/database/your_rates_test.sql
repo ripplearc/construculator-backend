@@ -6,9 +6,10 @@ BEGIN;
 -- from Decision 55 -- including the both-NULL-label case a plain UNIQUE
 -- constraint would miss -- RLS scoping across two companies via
 -- jwt_user_is_company_member(), the no-claim denial-by-default case, and the
--- shared updated_at trigger.
+-- shared updated_at trigger, the EXECUTE rights on the membership helper, an
+-- ON CONFLICT upsert with a NULL label, and one user in two companies.
 
-SELECT plan(26);
+SELECT plan(33);
 
 -- ============================================================
 -- Shape
@@ -163,6 +164,55 @@ SELECT lives_ok(
 );
 
 -- ============================================================
+-- Membership helper: EXECUTE rights
+-- ============================================================
+
+SELECT is(
+  has_function_privilege('anon', 'public.jwt_user_is_company_member(uuid)', 'EXECUTE'),
+  false,
+  'anon cannot execute jwt_user_is_company_member(uuid)'
+);
+
+SELECT is(
+  has_function_privilege('authenticated', 'public.jwt_user_is_company_member(uuid)', 'EXECUTE'),
+  true,
+  'authenticated can execute jwt_user_is_company_member(uuid) (the RLS policies run as that role)'
+);
+
+-- ============================================================
+-- Upsert target: ON CONFLICT on the four columns, with a NULL label
+-- ============================================================
+
+INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Upsert probe', 1.0000, 'USD', now());
+
+SELECT lives_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Upsert probe', 2.0000, 'USD', now())
+    ON CONFLICT (company_id, category, item_name, entry_label)
+    DO UPDATE SET rate_amount = EXCLUDED.rate_amount$$,
+  'An upsert on (company_id, category, item_name, entry_label) with a NULL label is accepted'
+);
+
+SELECT is(
+  (SELECT rate_amount FROM public.your_rates
+     WHERE company_id = '77777777-7777-7777-7777-777777777777'
+       AND category = 'material' AND item_name = 'Upsert probe'),
+  2.0000::numeric,
+  'The upsert updated the existing row in place'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.your_rates
+     WHERE company_id = '77777777-7777-7777-7777-777777777777'
+       AND category = 'material' AND item_name = 'Upsert probe'),
+  1::bigint,
+  'The upsert did not add a second row'
+);
+
+DELETE FROM public.your_rates WHERE item_name = 'Upsert probe';
+
+-- ============================================================
 -- updated_at trigger
 -- ============================================================
 
@@ -281,6 +331,35 @@ SELECT throws_ok(
   '42501',
   NULL,
   'A caller with no internal_user_id claim cannot save a rate for any company'
+);
+
+-- ============================================================
+-- RLS -- one user in two companies sees both companies' rows
+-- ============================================================
+
+RESET ROLE;
+
+INSERT INTO company_users (user_id, company_id, role_id)
+VALUES ('11111111-1111-1111-1111-111111111111', '88888888-8888-8888-8888-888888888888',
+        '66666666-6666-6666-6666-666666666666');
+
+SET LOCAL ROLE authenticated;
+
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": { "internal_user_id": "11111111-1111-1111-1111-111111111111" }
+}', true);
+
+SELECT is(
+  (SELECT count(DISTINCT company_id) FROM public.your_rates),
+  2::bigint,
+  'A user who belongs to two companies reads both companies'' rows when the query has no company filter'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.your_rates WHERE company_id = '88888888-8888-8888-8888-888888888888'),
+  1::bigint,
+  'Filtering by company_id narrows the read to one company, which is why the app must always filter'
 );
 
 SELECT * FROM finish();
