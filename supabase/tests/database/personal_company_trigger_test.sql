@@ -3,7 +3,7 @@ BEGIN;
 -- Tests for CA-710: the AFTER INSERT trigger on users that creates one
 -- personal company and one Admin company_users row, and get_my_company_id().
 
-SELECT plan(32);
+SELECT plan(40);
 
 -- ============================================================
 -- Fixtures
@@ -28,6 +28,12 @@ INSERT INTO auth.users (
    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'cccccccc-0000-0000-0000-000000000004', 'authenticated', 'authenticated',
    'client@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+   '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'cccccccc-0000-0000-0000-000000000005', 'authenticated', 'authenticated',
+   'blank@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+   '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'cccccccc-0000-0000-0000-000000000006', 'authenticated', 'authenticated',
+   'noadmin@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', '');
 
 -- ============================================================
@@ -87,48 +93,39 @@ SELECT is(
 );
 
 -- ============================================================
--- Retry: a user who already has a company_users row gets no second company
---
--- The trigger only fires on insert, so a temporary UPDATE trigger runs the
--- same function against a user who already has a company.
+-- Blank first name falls back to "My"
 -- ============================================================
 
-CREATE TRIGGER zz_retry_probe
-  AFTER UPDATE ON public.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.create_personal_company_for_new_user();
-
 SELECT lives_ok(
-  $$UPDATE public.users SET last_name = 'Retry' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000001'$$,
-  'Running the function again for a user with a company succeeds'
+  $$INSERT INTO public.users (id, credential_id, email, first_name, last_name, professional_role, user_preferences)
+    VALUES ('bbbbbbbb-0000-0000-0000-000000000005', 'cccccccc-0000-0000-0000-000000000005',
+            'blank@example.com', '   ', 'Test', 'aaaaaaaa-0000-0000-0000-000000000001', '{}')$$,
+  'A user with a blank first name can be inserted'
 );
 
 SELECT is(
-  (SELECT count(*) FROM public.company_users WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000001'),
-  1::bigint,
-  'The retry did not add a second company_users row'
+  (SELECT c.name FROM public.company_users cu JOIN public.companies c ON c.id = cu.company_id
+     WHERE cu.user_id = 'bbbbbbbb-0000-0000-0000-000000000005'),
+  'My''s company',
+  'A blank first name gives the company name "My''s company"'
 );
 
-SELECT is(
-  (SELECT count(*) FROM public.companies WHERE name = 'Dave''s company'),
-  2::bigint,
-  'The retry did not add a second company (only the two users'' companies exist)'
+-- ============================================================
+-- Missing Admin role: the users insert fails
+-- ============================================================
+
+UPDATE public.roles SET role_name = 'Admin (test rename)' WHERE role_name = 'Admin';
+
+SELECT throws_ok(
+  $$INSERT INTO public.users (id, credential_id, email, first_name, last_name, professional_role, user_preferences)
+    VALUES ('bbbbbbbb-0000-0000-0000-000000000006', 'cccccccc-0000-0000-0000-000000000006',
+            'noadmin@example.com', 'Noadmin', 'Test', 'aaaaaaaa-0000-0000-0000-000000000001', '{}')$$,
+  'P0002',
+  NULL,
+  'The users insert fails when there is no role named Admin'
 );
 
-DELETE FROM public.company_users WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000002';
-
-SELECT lives_ok(
-  $$UPDATE public.users SET last_name = 'Probe' WHERE id = 'bbbbbbbb-0000-0000-0000-000000000002'$$,
-  'Running the function for a user without a company succeeds'
-);
-
-SELECT is(
-  (SELECT count(*) FROM public.company_users WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000002'),
-  1::bigint,
-  'The check only skips users who have a company (the probe trigger does create one otherwise)'
-);
-
-DROP TRIGGER zz_retry_probe ON public.users;
+UPDATE public.roles SET role_name = 'Admin' WHERE role_name = 'Admin (test rename)';
 
 -- ============================================================
 -- Rollback: if the company insert fails, the users insert fails too
@@ -211,6 +208,15 @@ SELECT is(
      FROM unnest(ARRAY['anon', 'authenticated']) AS r),
   false,
   'Neither anon nor authenticated can execute the trigger function'
+);
+
+SELECT has_trigger('public', 'company_users', 'trigger_delete_empty_company', 'company_users has the empty company trigger');
+
+SELECT is(
+  (SELECT bool_or(has_function_privilege(r, 'public.delete_company_when_last_member_leaves()', 'EXECUTE'))
+     FROM unnest(ARRAY['anon', 'authenticated']) AS r),
+  false,
+  'Neither anon nor authenticated can execute the empty company trigger function'
 );
 
 SELECT is(
@@ -308,10 +314,77 @@ SELECT throws_ok(
 
 RESET ROLE;
 
+-- ============================================================
+-- Deleting a user
+-- ============================================================
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub": "cccccccc-0000-0000-0000-000000000004", "role": "authenticated"}', true);
+
+SELECT lives_ok(
+  $$DELETE FROM public.users WHERE id = 'bbbbbbbb-0000-0000-0000-000000000004'$$,
+  'A signed-in client can delete its own users row after the trigger gave it a company'
+);
+
+RESET ROLE;
+
 SELECT is(
-  (SELECT count(*) FROM pg_policy WHERE polrelid = 'public.users'::regclass AND polcmd = 'a'),
+  (SELECT count(*) FROM public.company_users WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000004'),
   0::bigint,
-  'No INSERT-only policy was added to users (inserts go through the existing owner policy)'
+  'Deleting the users row removed its company_users row'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies WHERE name = 'Client''s company'),
+  0::bigint,
+  'Deleting the users row removed the company left without members'
+);
+
+-- Put user 2 into user 1's company so the company has two members.
+INSERT INTO public.company_users (user_id, company_id, role_id)
+SELECT 'bbbbbbbb-0000-0000-0000-000000000002', company_id, role_id
+FROM public.company_users WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000001';
+
+SELECT lives_ok(
+  $$DELETE FROM auth.users WHERE id = 'cccccccc-0000-0000-0000-000000000001'$$,
+  'Deleting an auth account works for a user who has a company'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies c JOIN expected_company ec ON ec.company_id = c.id
+     WHERE ec.user_id = 'bbbbbbbb-0000-0000-0000-000000000001'),
+  1::bigint,
+  'The company stays while another member is left in it'
+);
+
+SELECT lives_ok(
+  $$DELETE FROM auth.users WHERE id = 'cccccccc-0000-0000-0000-000000000002'$$,
+  'Deleting the last member''s auth account works'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies c JOIN expected_company ec ON ec.company_id = c.id
+     WHERE ec.user_id = 'bbbbbbbb-0000-0000-0000-000000000001'),
+  0::bigint,
+  'The company is removed when its last member is deleted'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.users
+     WHERE id IN ('bbbbbbbb-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002')),
+  0::bigint,
+  'Deleting the auth accounts removed both users rows'
+);
+
+-- ============================================================
+-- Policies
+-- ============================================================
+
+SELECT is(
+  (SELECT array_agg(polname::text ORDER BY polname) || array_agg(polcmd::text ORDER BY polname)
+     FROM pg_policy WHERE polrelid = 'public.users'::regclass AND polcmd IN ('a', '*')),
+  ARRAY['users_owner_full_access', '*'],
+  'The only policy that allows INSERT on users is users_owner_full_access (FOR ALL)'
 );
 
 SELECT * FROM finish();

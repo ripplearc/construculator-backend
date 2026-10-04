@@ -123,13 +123,21 @@ SELECT get_my_company_id();
 **Purpose**: Gives every new user one personal company.
 - Listens to `AFTER INSERT` on `users` table
 - Executes `create_personal_company_for_new_user()`
-- Does nothing if the user already has a `company_users` row
 - Otherwise creates one `companies` row and one Admin `company_users` row
-- Company name is `first_name` plus "'s company". Duplicate names are accepted
+- Company name is `first_name` plus "'s company". A blank first name becomes "My". Duplicate names are accepted
 - Company email is `hidden-<company_id>@internal.construculator.app` and phone is `hidden-<company_id>`. These are placeholders for the required columns
 - If any step fails, the whole `users` insert rolls back
 - The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
 - The `Admin` row in `roles` must exist, or the insert fails. Migration `20261004120000_48_personal_company_trigger.sql` creates it, with the same id, level and description as the seeder
+- `Admin` is a project role (`context_type = 'project'`). It is reused on purpose for company membership and found by `role_name`. A separate company role would need a change to the trigger
+
+### `trigger_delete_empty_company`
+**Purpose**: Lets a user be deleted even though the trigger above gave them a company.
+- Listens to `AFTER DELETE` on `company_users` table
+- Executes `delete_company_when_last_member_leaves()`
+- Deletes the company when no `company_users` row is left, unless a project or team still points at it
+- `company_users.user_id` is `ON DELETE CASCADE`, so deleting a `users` row (or the `auth.users` account, which cascades to `users`) removes the membership first
+- The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
 
 ## Views
 
@@ -201,7 +209,7 @@ auth.uid() = credential_id
 
 **Note**: The app inserts the profile row itself during account creation, and this policy allows it. No trigger on `auth.users` creates the profile. Cross-user reads (e.g., viewing teammates) via `user_profiles` are deferred. The owner policy means the view only returns the caller's own row under `SECURITY INVOKER`. A separate policy will be introduced when team-based access is implemented.
 
-A user can delete and re-insert their own row. Each re-insert after a delete creates a new personal company, and the old company is left without members.
+A user can delete their own row. The `company_users` row goes with it, and the personal company is removed if no one else is a member and no project or team uses it (see `trigger_delete_empty_company`).
 
 ## Usage Examples
 
@@ -328,5 +336,6 @@ See test files:
 - `credential_id -> auth.users(id)` FK (`ON DELETE CASCADE`) added under CA-995, closing the gap where a hand-inserted `users` row could point at a nonexistent auth account
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
-- Personal company trigger and `get_my_company_id()` added in migration `20261004120000_48_personal_company_trigger.sql`
+- Personal company trigger, `get_my_company_id()`, `ON DELETE CASCADE` on `company_users.user_id` and the empty company trigger added in migration `20261004120000_48_personal_company_trigger.sql`
+- This migration has a later timestamp than the migrations in backend PRs #57 and #58. If it is pushed to a remote database first, those two need `supabase db push --include-all`
 - View created in migration `20251218175411_create_user_profile_view.sql`
