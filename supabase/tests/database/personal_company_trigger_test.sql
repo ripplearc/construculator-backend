@@ -3,7 +3,7 @@ BEGIN;
 -- Tests for CA-710: the AFTER INSERT trigger on users that creates one
 -- personal company and one Admin company_users row, and get_my_company_id().
 
-SELECT plan(40);
+SELECT plan(50);
 
 -- ============================================================
 -- Fixtures
@@ -93,7 +93,7 @@ SELECT is(
 );
 
 -- ============================================================
--- Blank first name falls back to "My"
+-- Blank first name falls back to "My company"
 -- ============================================================
 
 SELECT lives_ok(
@@ -106,8 +106,8 @@ SELECT lives_ok(
 SELECT is(
   (SELECT c.name FROM public.company_users cu JOIN public.companies c ON c.id = cu.company_id
      WHERE cu.user_id = 'bbbbbbbb-0000-0000-0000-000000000005'),
-  'My''s company',
-  'A blank first name gives the company name "My''s company"'
+  'My company',
+  'A blank first name gives the company name "My company"'
 );
 
 -- ============================================================
@@ -225,6 +225,14 @@ SELECT is(
      FROM pg_proc p WHERE p.oid = 'public.create_personal_company_for_new_user()'::regprocedure),
   true,
   'The trigger function is SECURITY DEFINER, owned by postgres, with search_path set to public'
+);
+
+SELECT is(
+  (SELECT p.prosecdef AND pg_get_userbyid(p.proowner) = 'postgres'
+          AND p.proconfig @> ARRAY['search_path=public']
+     FROM pg_proc p WHERE p.oid = 'public.delete_company_when_last_member_leaves()'::regprocedure),
+  true,
+  'The empty company trigger function is SECURITY DEFINER, owned by postgres, with search_path set to public'
 );
 
 SELECT is(
@@ -374,6 +382,107 @@ SELECT is(
      WHERE id IN ('bbbbbbbb-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002')),
   0::bigint,
   'Deleting the auth accounts removed both users rows'
+);
+
+-- ============================================================
+-- A company that is still in use is kept when its last member leaves
+-- ============================================================
+
+INSERT INTO auth.users (
+  "instance_id", "id", "aud", "role", "email", "encrypted_password", "email_confirmed_at",
+  "raw_app_meta_data", "raw_user_meta_data", "created_at", "updated_at",
+  "confirmation_token", "recovery_token", "email_change_token_new", "email_change"
+)
+SELECT '00000000-0000-0000-0000-000000000000', ('cccccccc-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid,
+       'authenticated', 'authenticated', 'inuse' || n || '@example.com',
+       extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+       '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''
+FROM generate_series(7, 11) AS n;
+
+-- 07: first name made of a tab, a no-break space and a zero-width space around "Tab"
+-- 08: owner of a company used by a project, 09: by a team, 10: creator of the project, 11: by a row in another table
+INSERT INTO public.users (id, credential_id, email, first_name, last_name, professional_role, user_preferences)
+SELECT ('bbbbbbbb-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid,
+       ('cccccccc-0000-0000-0000-0000000000' || lpad(n::text, 2, '0'))::uuid,
+       'inuse' || n || '@example.com',
+       CASE WHEN n = 7 THEN E'\t\u00A0\u200BTab\u200B\u00A0\n' ELSE 'Inuse' || n END,
+       'Test', 'aaaaaaaa-0000-0000-0000-000000000001', '{}'
+FROM generate_series(7, 11) AS n;
+
+SELECT is(
+  (SELECT c.name FROM public.company_users cu JOIN public.companies c ON c.id = cu.company_id
+     WHERE cu.user_id = 'bbbbbbbb-0000-0000-0000-000000000007'),
+  'Tab''s company',
+  'Tabs, new lines, no-break spaces and zero-width spaces around the first name are trimmed'
+);
+
+CREATE TEMP TABLE in_use_company AS
+  SELECT user_id, company_id FROM public.company_users
+  WHERE user_id IN ('bbbbbbbb-0000-0000-0000-000000000008', 'bbbbbbbb-0000-0000-0000-000000000009',
+                    'bbbbbbbb-0000-0000-0000-000000000011');
+
+INSERT INTO public.projects (project_name, creator_user_id, owning_company_id)
+SELECT 'Kept by project', 'bbbbbbbb-0000-0000-0000-000000000010', company_id
+FROM in_use_company WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000008';
+
+SELECT lives_ok(
+  $$DELETE FROM public.users WHERE id = 'bbbbbbbb-0000-0000-0000-000000000008'$$,
+  'A user whose company owns a project can be deleted'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies c JOIN in_use_company i ON i.company_id = c.id
+     WHERE i.user_id = 'bbbbbbbb-0000-0000-0000-000000000008'),
+  1::bigint,
+  'The company is kept while a project still uses it'
+);
+
+INSERT INTO public.teams (company_id, team_name)
+SELECT company_id, 'Kept by team' FROM in_use_company WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000009';
+
+SELECT lives_ok(
+  $$DELETE FROM public.users WHERE id = 'bbbbbbbb-0000-0000-0000-000000000009'$$,
+  'A user whose company has a team can be deleted'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies c JOIN in_use_company i ON i.company_id = c.id
+     WHERE i.user_id = 'bbbbbbbb-0000-0000-0000-000000000009'),
+  1::bigint,
+  'The company is kept while a team still uses it'
+);
+
+-- A table the function has never heard of, standing in for your_rates and any later table.
+CREATE TABLE public.zz_company_probe (
+  id int PRIMARY KEY,
+  company_id uuid NOT NULL REFERENCES public.companies(id)
+);
+
+INSERT INTO public.zz_company_probe (id, company_id)
+SELECT 1, company_id FROM in_use_company WHERE user_id = 'bbbbbbbb-0000-0000-0000-000000000011';
+
+SELECT lives_ok(
+  $$DELETE FROM auth.users WHERE id = 'cccccccc-0000-0000-0000-000000000011'$$,
+  'Deleting an auth account works when another table points at the company'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.users WHERE id = 'bbbbbbbb-0000-0000-0000-000000000011'),
+  0::bigint,
+  'The users row is gone'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.companies c JOIN in_use_company i ON i.company_id = c.id
+     WHERE i.user_id = 'bbbbbbbb-0000-0000-0000-000000000011'),
+  1::bigint,
+  'The company is kept while a row in another table still uses it'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.zz_company_probe),
+  1::bigint,
+  'The row in the other table is untouched'
 );
 
 -- ============================================================

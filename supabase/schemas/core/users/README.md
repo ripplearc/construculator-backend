@@ -124,7 +124,7 @@ SELECT get_my_company_id();
 - Listens to `AFTER INSERT` on `users` table
 - Executes `create_personal_company_for_new_user()`
 - Otherwise creates one `companies` row and one Admin `company_users` row
-- Company name is `first_name` plus "'s company". A blank first name becomes "My". Duplicate names are accepted
+- Company name is `first_name` plus "'s company". A first name that is empty or only spaces, tabs, new lines or no-break/zero-width spaces gives "My company". Duplicate names are accepted
 - Company email is `hidden-<company_id>@internal.construculator.app` and phone is `hidden-<company_id>`. These are placeholders for the required columns
 - If any step fails, the whole `users` insert rolls back
 - The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
@@ -135,7 +135,8 @@ SELECT get_my_company_id();
 **Purpose**: Lets a user be deleted even though the trigger above gave them a company.
 - Listens to `AFTER DELETE` on `company_users` table
 - Executes `delete_company_when_last_member_leaves()`
-- Deletes the company when no `company_users` row is left, unless a project or team still points at it
+- Deletes the company when no `company_users` row is left, unless any row still points at it (a project, a team, `your_rates`, or any later table). The delete is tried and a foreign key refusal is caught, so no list of tables has to be kept
+- Locks the company row first (`FOR UPDATE`), so two sessions leaving or joining at once wait for each other
 - `company_users.user_id` is `ON DELETE CASCADE`, so deleting a `users` row (or the `auth.users` account, which cascades to `users`) removes the membership first
 - The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
 

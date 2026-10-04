@@ -21,7 +21,10 @@ BEGIN
   INSERT INTO "public"."companies" ("id", "name", "email", "phone")
   VALUES (
     v_company_id,
-    COALESCE(NULLIF(trim(NEW."first_name"), ''), 'My') || '''s company',
+    COALESCE(
+      NULLIF(regexp_replace(NEW."first_name", '^[[:space:]\u200B\u00A0\uFEFF]+|[[:space:]\u200B\u00A0\uFEFF]+$', '', 'g'), '') || '''s company',
+      'My company'
+    ),
     'hidden-' || v_company_id || '@internal.construculator.app',
     'hidden-' || v_company_id
   );
@@ -60,11 +63,22 @@ CREATE OR REPLACE FUNCTION "public"."delete_company_when_last_member_leaves"()
     SET "search_path" TO 'public'
     AS $$
 BEGIN
-  DELETE FROM "public"."companies"
-  WHERE "id" = OLD."company_id"
-    AND NOT EXISTS (SELECT 1 FROM "public"."company_users" WHERE "company_id" = OLD."company_id")
-    AND NOT EXISTS (SELECT 1 FROM "public"."projects" WHERE "owning_company_id" = OLD."company_id")
-    AND NOT EXISTS (SELECT 1 FROM "public"."teams" WHERE "company_id" = OLD."company_id");
+  -- Lock the company row first. Two sessions that leave or join at the same
+  -- time then wait for each other instead of both seeing a stale member count.
+  PERFORM 1 FROM "public"."companies" WHERE "id" = OLD."company_id" FOR UPDATE;
+
+  IF EXISTS (SELECT 1 FROM "public"."company_users" WHERE "company_id" = OLD."company_id") THEN
+    RETURN OLD;
+  END IF;
+
+  -- Every table that points at companies uses NO ACTION, so the delete is
+  -- refused while any row (project, team, your_rates, a future table) still
+  -- uses the company. Keep the company in that case so the user delete goes on.
+  BEGIN
+    DELETE FROM "public"."companies" WHERE "id" = OLD."company_id";
+  EXCEPTION WHEN foreign_key_violation THEN
+    NULL;
+  END;
 
   RETURN OLD;
 END;
@@ -74,7 +88,7 @@ ALTER FUNCTION "public"."delete_company_when_last_member_leaves"() OWNER TO "pos
 
 REVOKE EXECUTE ON FUNCTION "public"."delete_company_when_last_member_leaves"() FROM PUBLIC, "anon", "authenticated";
 
-COMMENT ON FUNCTION "public"."delete_company_when_last_member_leaves"() IS 'Trigger function for company_users. Deletes the company when its last company_users row is deleted, unless a project or team still points at it. Not callable by clients.';
+COMMENT ON FUNCTION "public"."delete_company_when_last_member_leaves"() IS 'Trigger function for company_users. Deletes the company when its last company_users row is deleted, unless any row (project, team, your_rates, or another table) still points at it. Not callable by clients.';
 
 CREATE OR REPLACE TRIGGER "trigger_delete_empty_company"
     AFTER DELETE ON "public"."company_users"
