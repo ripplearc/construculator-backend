@@ -95,6 +95,21 @@ SELECT check_email_exists('user@example.com');
 -- Returns: true or false
 ```
 
+### `get_my_company_id()`
+**Purpose**: Returns the signed-in caller's own company id, or `NULL` if the caller has none.
+
+**Security**:
+- `SECURITY DEFINER`, `search_path` set to `public`
+- Finds the caller through `auth.uid()`, `users.credential_id`, `users.id` and `company_users`
+- Does not use the `internal_user_id` token claim, so it works straight after sign-up
+- `EXECUTE` is revoked from `PUBLIC` and `anon`, and granted to `authenticated`
+- Needed because `company_users` has RLS on and no policies
+
+**Example**:
+```sql
+SELECT get_my_company_id();
+```
+
 ## Triggers
 
 ### `trigger_update_users_updated_at`
@@ -102,6 +117,18 @@ SELECT check_email_exists('user@example.com');
 - Listens to `BEFORE UPDATE` on `users` table
 - Executes shared `set_current_timestamp_updated_at()` function
 - Guarantees `updated_at` matches the exact time of the change
+
+### `trigger_create_personal_company`
+**Purpose**: Gives every new user one personal company.
+- Listens to `AFTER INSERT` on `users` table
+- Executes `create_personal_company_for_new_user()`
+- Does nothing if the user already has a `company_users` row
+- Otherwise creates one `companies` row and one Admin `company_users` row
+- Company name is `first_name` plus "'s company". Duplicate names are accepted
+- Company email is `hidden-<company_id>@internal.construculator.app` and phone is `hidden-<company_id>`. These are placeholders for the required columns
+- If any step fails, the whole `users` insert rolls back
+- The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
+- The `Admin` row in `roles` must exist, or the insert fails
 
 ## Views
 
@@ -159,13 +186,27 @@ auth.uid() = credential_id
 auth.uid() = credential_id
 ```
 
-**Note**: INSERT is intentionally excluded from RLS. User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users` to prevent duplicate profile rows. Cross-user reads (e.g., viewing teammates) via `user_profiles` are deferred — the current `users_select_own` policy means the view only returns the caller's own row under `SECURITY INVOKER`. A separate policy will be introduced when team-based access is implemented.
+### Owner Policy
+**Name**: `users_owner_full_access` (migration `20251218175536_RLS_07_users_table_rules.sql`)
+
+**Applies to**: Authenticated users
+
+**Access**: ALL (select, insert, update, delete)
+
+**Rule**: Users can act only on their own row. Both the read check and the write check are:
+```sql
+auth.uid() = credential_id
+```
+
+**Note**: The app inserts the profile row itself during account creation, and this policy allows it. No trigger on `auth.users` creates the profile. Cross-user reads (e.g., viewing teammates) via `user_profiles` are deferred. The owner policy means the view only returns the caller's own row under `SECURITY INVOKER`. A separate policy will be introduced when team-based access is implemented.
+
+A user can delete and re-insert their own row. Each re-insert after a delete creates a new personal company, and the old company is left without members.
 
 ## Usage Examples
 
 ### Creating a New User Profile
 
-User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users`, not through open client-side RLS. Direct `INSERT` on the `users` table is not permitted via RLS to prevent duplicate profiles.
+The app inserts the profile row itself during account creation. The `users_owner_full_access` policy allows the insert when `credential_id` matches `auth.uid()`. The `AFTER INSERT` trigger then creates the user's personal company (see Triggers).
 
 ### Updating User Profile
 ```sql
@@ -250,9 +291,8 @@ WHERE id = 'user-uuid';
 ## Best Practices
 
 ### Profile Creation
-- User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users`
-- Never expose a direct INSERT path through client-side RLS to prevent duplicate profiles
-- Ensure `credential_id` matches `auth.uid()`
+- The app inserts the profile row itself. The insert is allowed only when `credential_id` matches `auth.uid()`
+- The `AFTER INSERT` trigger on `users` creates the personal company in the same transaction
 
 ### Email Validation
 - Check existence before account creation
@@ -279,10 +319,12 @@ WHERE id = 'user-uuid';
 
 See test files:
 - `supabase/tests/functions/check_email_exists_test.sql`
+- `supabase/tests/database/personal_company_trigger_test.sql`
 
 ## Migration Notes
 
 - `credential_id` was introduced to link auth.users
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
+- Personal company trigger and `get_my_company_id()` added in migration `20261004120000_44_personal_company_trigger.sql`
 - View created in migration `20251218175411_create_user_profile_view.sql`
