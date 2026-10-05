@@ -3,7 +3,24 @@ BEGIN;
 -- Tests for CA-710: the AFTER INSERT trigger on users that creates one
 -- personal company and one Admin company_users row, and get_my_company_id().
 
-SELECT plan(50);
+SELECT plan(51);
+
+-- ============================================================
+-- The cleanup trigger deletes the company and relies on Postgres refusing when
+-- a row still uses it. That only works for NO ACTION and RESTRICT foreign keys,
+-- so a later table that points at companies with CASCADE or SET NULL must fail
+-- here. This runs before the fixtures, so no test table is counted.
+-- ============================================================
+
+SELECT is(
+  (SELECT coalesce(string_agg(conrelid::regclass::text || '.' || conname, ', ' ORDER BY conname), '')
+     FROM pg_constraint
+     WHERE contype = 'f'
+       AND confrelid = 'public.companies'::regclass
+       AND confdeltype NOT IN ('a', 'r')),
+  '',
+  'Every foreign key to companies is NO ACTION or RESTRICT, so the cleanup trigger cannot delete or change another table''s rows'
+);
 
 -- ============================================================
 -- Fixtures
