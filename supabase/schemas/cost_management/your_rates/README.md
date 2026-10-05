@@ -20,7 +20,12 @@ but that grouping can now hold several entries, disambiguated by
   rate blocks a hard company delete, like every other `companies` reference)
 - `category` - `cost_item_type_enum`: `'material'`, `'labor'`, or
   `'equipment'` (reused directly, not a new enum)
-- `item_name` - Display name for the item
+- `item_name` - Display name for the item, kept in the contractor's own spelling
+- `item_name_key` - Generated and stored: `item_name` in lower case, outer
+  spaces trimmed, inner whitespace collapsed to one space. The collision
+  constraint compares this column, so `Mini excavator`, `MINI  EXCAVATOR` and
+  ` mini excavator ` are one name ("Names match without regard to capital
+  letters or extra spaces", storyboard CUJ 6). Never written by a client
 
 ### Rate Fields
 - `rate_amount` - `numeric(18,4)`, mirrors `cost_items.unit_price`
@@ -51,12 +56,17 @@ but that grouping can now hold several entries, disambiguated by
 
 ### Collision / save semantics (Decision 55)
 
-A "collision" is on `(company_id, category, item_name)` — never on `id`,
+A "collision" is on `(company_id, category, item_name_key, equipment_method)` plus the label — never on `id`,
 which is an ordinary server-generated primary key, not chosen by the caller
 and not part of collision detection.
 
+Day and Job are separate rows: one machine saved with a day rate and with a job
+price is two rows, each with its own price and unit ("Saved with both",
+storyboard CUJ 6). A second save with the same name and the same basis is the
+collision case below.
+
 Saving an entry:
-- No existing row in that `(company_id, category, item_name)` grouping →
+- No existing row in that `(company_id, category, item_name_key, equipment_method)` grouping →
   always succeeds, inserts a new row (with or without `entry_label`).
 - An existing row in that grouping has the **exact same** `entry_label`
   (including both `NULL`) → update that row in place (silent overwrite).
@@ -69,16 +79,16 @@ Saving an entry:
 This branching logic lives in the Flutter repository (`YourRatesRepository`,
 a separate PR) — it is query-then-decide application logic, not something
 the database can express as a single constraint. What this schema provides
-is the safety net beneath it: `your_rates_company_category_item_label_key`
+is the safety net beneath it: `your_rates_company_category_name_method_label_key`
 (see `01_table.sql`), a `UNIQUE NULLS NOT DISTINCT` constraint on
-`(company_id, category, item_name, entry_label)`. A plain
-`UNIQUE (company_id, category, item_name, entry_label)` would **not** catch
+`(company_id, category, item_name_key, equipment_method, entry_label)`. A plain
+`UNIQUE` on the same columns would **not** catch
 two `NULL`-labeled rows in the same grouping — Postgres treats `NULL <>
 NULL` for uniqueness — `NULLS NOT DISTINCT` (Postgres 15+) makes two `NULL`s
 count as equal for this constraint instead. The same constraint also serves
 as the grouping lookup index and, being a real column-list constraint rather
 than an expression index, is a valid
-`upsert(onConflict: 'company_id,category,item_name,entry_label')` target for
+`upsert(onConflict: 'company_id,category,item_name_key,equipment_method,entry_label')` target for
 the "exact same label" update-in-place case — the app does not use upsert
 today, but this keeps the option open without a schema change.
 
@@ -96,13 +106,21 @@ building it.
 ## Indexes
 
 - `your_rates_pkey` - Primary key on `id`
-- `your_rates_company_category_item_label_key` - `UNIQUE NULLS NOT DISTINCT`
-  constraint on `(company_id, category, item_name, entry_label)`. Enforces
-  the collision constraint above and doubles as the grouping lookup index —
-  its leading three columns satisfy `(company_id, category, item_name)`
+- `your_rates_company_category_name_method_label_key` - `UNIQUE NULLS NOT DISTINCT`
+  constraint on `(company_id, category, item_name_key, equipment_method, entry_label)`.
+  Enforces the collision constraint above and doubles as the grouping lookup
+  index — its leading columns satisfy `(company_id, category, item_name_key)`
   lookups without a separate, redundant index. Postgres builds a unique
   index for it automatically, and it is a valid
-  `onConflict: 'company_id,category,item_name,entry_label'` upsert target.
+  `onConflict: 'company_id,category,item_name_key,equipment_method,entry_label'` upsert target.
+
+## Row rules (CHECK constraints)
+
+- `your_rates_item_name_not_blank` - `item_name` is not empty or only spaces
+- `your_rates_rate_amount_not_negative` - `rate_amount >= 0`
+- `your_rates_rate_currency_not_blank` - `rate_currency` is not empty or only spaces
+- `your_rates_equipment_method_equipment_only` - `equipment_method` is only
+  set on `category = 'equipment'` rows
 
 ## RLS Policies
 
@@ -162,6 +180,7 @@ evaluated against replicated state, the same role `role_permissions` /
 
 See `supabase/tests/database/your_rates_test.sql`:
 table/PK/FK/index shape, the unique constraint's collision behavior
-(including the both-`NULL`-label case), RLS SELECT/INSERT/UPDATE scoping
+(including the both-`NULL`-label case, a Day row next to a Job row, and names
+that differ only by case or spaces), the CHECK rules, RLS SELECT/INSERT/UPDATE scoping
 across two companies, the no-claim denial-by-default case, and the
 `updated_at` trigger.

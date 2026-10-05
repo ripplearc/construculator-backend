@@ -2,14 +2,15 @@ BEGIN;
 
 -- Tests for CA-1145: your_rates, the contractor's personal saved-rate book.
 -- Covers table/PK/FK shape, the UNIQUE NULLS NOT DISTINCT constraint that
--- enforces the (company_id, category, item_name, entry_label) collision rule
--- from Decision 55 -- including the both-NULL-label case a plain UNIQUE
--- constraint would miss -- RLS scoping across two companies via
+-- enforces the (company_id, category, item_name_key, equipment_method,
+-- entry_label) collision rule from Decision 55 -- including the both-NULL case
+-- a plain UNIQUE constraint would miss, a Day row and a Job row for one name,
+-- names that differ only by case or spaces, and the CHECK rules -- RLS scoping across two companies via
 -- jwt_user_is_company_member(), the no-claim denial-by-default case, and the
 -- shared updated_at trigger, the EXECUTE rights on the membership helper, an
 -- ON CONFLICT upsert with a NULL label, and one user in two companies.
 
-SELECT plan(33);
+SELECT plan(47);
 
 -- ============================================================
 -- Shape
@@ -22,16 +23,16 @@ SELECT col_is_fk('public', 'your_rates', 'company_id', 'your_rates.company_id is
 SELECT ok(
   EXISTS (
     SELECT 1 FROM pg_constraint
-    WHERE conname = 'your_rates_company_category_item_label_key'
+    WHERE conname = 'your_rates_company_category_name_method_label_key'
       AND conrelid = 'public.your_rates'::regclass
       AND contype = 'u'
   ),
-  'your_rates has a UNIQUE constraint on (company_id, category, item_name, entry_label)'
+  'your_rates has a UNIQUE constraint on (company_id, category, item_name_key, equipment_method, entry_label)'
 );
 
 SELECT is(
   (SELECT indnullsnotdistinct FROM pg_index
-     WHERE indexrelid = 'public.your_rates_company_category_item_label_key'::regclass),
+     WHERE indexrelid = 'public.your_rates_company_category_name_method_label_key'::regclass),
   true,
   'The collision constraint treats NULLs as equal (NULLS NOT DISTINCT), catching the both-NULL-label case'
 );
@@ -164,6 +165,125 @@ SELECT lives_ok(
 );
 
 -- ============================================================
+-- Day and Job are separate rows ("Saved with both", storyboard CUJ 6)
+-- ============================================================
+
+SELECT lives_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Mini excavator', 145.0000, 'USD', 'day', 'day', now())$$,
+  'A Day rate for a machine saves'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Mini excavator', 520.0000, 'USD', 'job', 'job', now())$$,
+  'A Job price for the same machine, with no label, saves next to the Day rate'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.your_rates
+     WHERE company_id = '77777777-7777-7777-7777-777777777777' AND item_name = 'Mini excavator'),
+  2::bigint,
+  'The Day row and the Job row both exist for one name'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now())$$,
+  '23505',
+  NULL,
+  'A second Day row for the same name with no label is still rejected'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now())
+    ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label)
+    DO UPDATE SET rate_amount = EXCLUDED.rate_amount$$,
+  'An upsert on the five key columns replaces the Day row'
+);
+
+SELECT results_eq(
+  $$SELECT equipment_method::text, rate_amount FROM public.your_rates
+      WHERE company_id = '77777777-7777-7777-7777-777777777777' AND item_name = 'Mini excavator'
+      ORDER BY equipment_method$$,
+  $$VALUES ('day', 150.0000::numeric), ('job', 520.0000::numeric)$$,
+  'The upsert changed the Day row and left the Job row at its own price'
+);
+
+-- ============================================================
+-- Names match without regard to case or extra spaces
+-- ============================================================
+
+SELECT is(
+  (SELECT item_name_key FROM public.your_rates
+     WHERE company_id = '77777777-7777-7777-7777-777777777777' AND item_name = 'Mini excavator' AND equipment_method = 'day'),
+  'mini excavator',
+  'item_name_key holds the name in lower case'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'MINI  EXCAVATOR', 160.0000, 'USD', 'day', 'day', now())$$,
+  '23505',
+  NULL,
+  'The same name in capitals with a doubled space collides with the saved Day row'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', '  mini excavator ', 160.0000, 'USD', 'day', 'day', now())$$,
+  '23505',
+  NULL,
+  'The same name with spaces around it collides with the saved Day row'
+);
+
+SELECT is(
+  (SELECT item_name FROM public.your_rates
+     WHERE company_id = '77777777-7777-7777-7777-777777777777' AND item_name_key = 'mini excavator' AND equipment_method = 'job'),
+  'Mini excavator',
+  'The saved row keeps the contractor''s own spelling for display'
+);
+
+DELETE FROM public.your_rates WHERE item_name = 'Mini excavator';
+
+-- ============================================================
+-- Row rules
+-- ============================================================
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'material', '   ', 1.0000, 'USD', now())$$,
+  '23514',
+  NULL,
+  'A blank item_name is rejected'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Negative probe', -5.0000, 'USD', now())$$,
+  '23514',
+  NULL,
+  'A negative rate_amount is rejected'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Currency probe', 1.0000, ' ', now())$$,
+  '23514',
+  NULL,
+  'A blank rate_currency is rejected'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Method probe', 1.0000, 'USD', 'day', now())$$,
+  '23514',
+  NULL,
+  'An equipment_method on a material row is rejected'
+);
+
+-- ============================================================
 -- Membership helper: EXECUTE rights
 -- ============================================================
 
@@ -180,7 +300,7 @@ SELECT is(
 );
 
 -- ============================================================
--- Upsert target: ON CONFLICT on the four columns, with a NULL label
+-- Upsert target: ON CONFLICT on the five key columns, with a NULL label
 -- ============================================================
 
 INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
@@ -189,9 +309,9 @@ VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Upsert probe', 1.00
 SELECT lives_ok(
   $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
     VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Upsert probe', 2.0000, 'USD', now())
-    ON CONFLICT (company_id, category, item_name, entry_label)
+    ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label)
     DO UPDATE SET rate_amount = EXCLUDED.rate_amount$$,
-  'An upsert on (company_id, category, item_name, entry_label) with a NULL label is accepted'
+  'An upsert on (company_id, category, item_name_key, equipment_method, entry_label) with a NULL label is accepted'
 );
 
 SELECT is(
