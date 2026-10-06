@@ -1,0 +1,35 @@
+-- CA-1265: Add your_rates.last_used_at, the last time a cost line was added
+-- with this saved rate.
+--
+-- The app (CA-1258) orders Your recents and the look-up by the last use and
+-- words each row "Used 3 days ago". The storyboard (CUJ 6, "Used label")
+-- defines a use as the last time the rate was added to any estimate, stamped
+-- by the phone that adds the line. A rate that was saved but never added reads
+-- "Saved 3 days ago" instead, so empty (NULL) means "never added".
+--
+-- Client-supplied, like saved_at: domain time, not row-modification time, so
+-- it has no default. No CHECK against saved_at: saving a new price later moves
+-- saved_at past an older last_used_at, and that is a valid state.
+--
+-- No policy or publication change is needed. your_rates_update_policy is not
+-- limited to columns, so a company member can already write the new column,
+-- and the powersync publication was added without a column list, so the new
+-- column is replicated. The user_rates stream in powersync/sync-config.yaml
+-- lists its columns, so it is updated in this change.
+--
+-- Written by hand like migration 45. Mirrors
+-- supabase/schemas/cost_management/your_rates/01_table.sql, keep them in step.
+--
+-- ADD COLUMN puts the column last. The schema mirror lists it last too.
+--
+-- Deploy order: apply this migration first, then deploy the sync-config
+-- change. A stream that selects a column the table does not have is rejected.
+--
+-- Rollback (manual, Supabase migrations are append-only), in this order:
+--   1. Remove last_used_at from the user_rates stream and redeploy the sync
+--      config.
+--   2. ALTER TABLE public.your_rates DROP COLUMN last_used_at;
+-- https://ripplearc.youtrack.cloud/issue/CA-1265
+
+ALTER TABLE "public"."your_rates"
+    ADD COLUMN IF NOT EXISTS "last_used_at" timestamp with time zone;

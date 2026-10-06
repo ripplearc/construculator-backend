@@ -9,7 +9,7 @@ BEGIN;
 -- nothing -- there is no error to notice), and that every column the
 -- stream's query and accessible_companies CTE name still exists.
 
-SELECT plan(16);
+SELECT plan(17);
 
 -- ============================================================
 -- Publication membership
@@ -59,6 +59,8 @@ SELECT has_column('public', 'your_rates', 'entry_label',
   'your_rates.entry_label is selected by the user_rates stream');
 SELECT has_column('public', 'your_rates', 'saved_at',
   'your_rates.saved_at is selected by the user_rates stream');
+SELECT has_column('public', 'your_rates', 'last_used_at',
+  'your_rates.last_used_at is selected by the user_rates stream');
 SELECT has_column('public', 'your_rates', 'created_at',
   'your_rates.created_at is selected by the user_rates stream');
 SELECT has_column('public', 'your_rates', 'updated_at',
