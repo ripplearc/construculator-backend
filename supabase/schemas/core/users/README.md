@@ -111,6 +111,28 @@ SELECT check_email_exists('user@example.com');
 SELECT get_my_company_id();
 ```
 
+### `ensure_my_company()`
+**Purpose**: Returns the signed-in caller's company id, creating a personal company first if the caller has none. The app calls it at sign-in (CA-1262), which repairs an account that has a profile but no company.
+
+**Behavior**:
+- Safe to call twice: the second call returns the same company. The caller's `users` row is locked (`FOR UPDATE`) so two calls at the same time wait for each other
+- Returns `NULL`, and creates nothing, if the caller has no `users` row yet
+- Creates the company through `create_personal_company()`, the same function the trigger below uses, so the name, placeholder email and phone and Admin row are the same
+- If the caller already has several companies, returns the oldest, like `get_my_company_id()`
+
+**Security**:
+- `SECURITY DEFINER`, `search_path` set to `public`
+- `EXECUTE` is revoked from `PUBLIC` and `anon`, and granted to `authenticated`
+
+**Example**:
+```sql
+SELECT ensure_my_company();
+```
+
+### `create_personal_company(user_id, first_name)`
+**Purpose**: Creates one `companies` row and one Admin `company_users` row for the given user, and returns the company id. Called by the trigger below and by `ensure_my_company()`.
+- `SECURITY DEFINER`, `search_path` set to `public`. `EXECUTE` is revoked from `PUBLIC`, `anon` and `authenticated`
+
 ## Triggers
 
 ### `trigger_update_users_updated_at`
@@ -122,7 +144,7 @@ SELECT get_my_company_id();
 ### `trigger_create_personal_company`
 **Purpose**: Gives every new user one personal company.
 - Listens to `AFTER INSERT` on `users` table
-- Executes `create_personal_company_for_new_user()`
+- Executes `create_personal_company_for_new_user()`, which calls `create_personal_company()`
 - Otherwise creates one `companies` row and one Admin `company_users` row
 - Company name is `first_name` plus "'s company". A first name that is empty or only spaces, tabs, new lines or no-break/zero-width spaces gives "My company". Duplicate names are accepted
 - Company email is `hidden-<company_id>@internal.construculator.app` and phone is `hidden-<company_id>`. These are placeholders for the required columns
@@ -330,6 +352,7 @@ WHERE id = 'user-uuid';
 See test files:
 - `supabase/tests/functions/check_email_exists_test.sql`
 - `supabase/tests/database/personal_company_trigger_test.sql`
+- `supabase/tests/database/ensure_my_company_test.sql`
 
 ## Migration Notes
 
@@ -338,5 +361,6 @@ See test files:
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
 - Personal company trigger, `get_my_company_id()`, `ON DELETE CASCADE` on `company_users.user_id` and the empty company trigger added in migration `20261004120000_48_personal_company_trigger.sql`
+- `ensure_my_company()` and `create_personal_company()` added in migration `20261006120000_49_ensure_my_company.sql`, which also moves the company creation out of the trigger function
 - This migration has a later timestamp than the migrations in backend PRs #57 and #58. If it is pushed to a remote database first, those two need `supabase db push --include-all`
 - View created in migration `20251218175411_create_user_profile_view.sql`

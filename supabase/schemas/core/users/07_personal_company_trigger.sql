@@ -4,8 +4,8 @@
 -- purpose for company membership, and the trigger finds it by role_name.
 -- Runs in the same transaction as the users insert, so a failure rolls back both.
 
-CREATE OR REPLACE FUNCTION "public"."create_personal_company_for_new_user"()
-    RETURNS TRIGGER
+CREATE OR REPLACE FUNCTION "public"."create_personal_company"("p_user_id" uuid, "p_first_name" text)
+    RETURNS uuid
     LANGUAGE "plpgsql"
     SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -22,7 +22,7 @@ BEGIN
   VALUES (
     v_company_id,
     COALESCE(
-      NULLIF(regexp_replace(NEW."first_name", '^[[:space:]\u200B\u00A0\uFEFF]+|[[:space:]\u200B\u00A0\uFEFF]+$', '', 'g'), '') || '''s company',
+      NULLIF(regexp_replace("p_first_name", '^[[:space:]\u200B\u00A0\uFEFF]+|[[:space:]\u200B\u00A0\uFEFF]+$', '', 'g'), '') || '''s company',
       'My company'
     ),
     'hidden-' || v_company_id || '@internal.construculator.app',
@@ -30,8 +30,26 @@ BEGIN
   );
 
   INSERT INTO "public"."company_users" ("user_id", "company_id", "role_id")
-  VALUES (NEW."id", v_company_id, v_admin_role_id);
+  VALUES ("p_user_id", v_company_id, v_admin_role_id);
 
+  RETURN v_company_id;
+END;
+$$;
+
+ALTER FUNCTION "public"."create_personal_company"(uuid, text) OWNER TO "postgres";
+
+REVOKE EXECUTE ON FUNCTION "public"."create_personal_company"(uuid, text) FROM PUBLIC, "anon", "authenticated";
+
+COMMENT ON FUNCTION "public"."create_personal_company"(uuid, text) IS 'Creates one personal company and one Admin company_users row for the given user, and returns the company id. Used by the users trigger and ensure_my_company(). Not callable by clients.';
+
+CREATE OR REPLACE FUNCTION "public"."create_personal_company_for_new_user"()
+    RETURNS TRIGGER
+    LANGUAGE "plpgsql"
+    SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+BEGIN
+  PERFORM "public"."create_personal_company"(NEW."id", NEW."first_name");
   RETURN NEW;
 END;
 $$;

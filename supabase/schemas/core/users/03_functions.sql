@@ -49,3 +49,49 @@ GRANT EXECUTE ON FUNCTION "public"."get_my_company_id"() TO "authenticated";
 
 
 COMMENT ON FUNCTION "public"."get_my_company_id"() IS 'Returns the company id of the caller (found through auth.uid() and users.credential_id), or NULL if the caller has no company. Returns only the caller''s own company. Does not need the internal_user_id token claim.';
+
+
+-- Ensure Company
+-- Creates the caller's personal company if there is none, and returns its id.
+-- Depends on create_personal_company() in 07_personal_company_trigger.sql.
+
+CREATE OR REPLACE FUNCTION "public"."ensure_my_company"() RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_first_name text;
+  v_company_id uuid;
+BEGIN
+  -- The row lock makes two calls for the same user wait for each other, so the
+  -- second one finds the company the first one created.
+  SELECT "id", "first_name" INTO v_user_id, v_first_name
+  FROM "public"."users"
+  WHERE "credential_id" = "auth"."uid"()
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT "company_id" INTO v_company_id
+  FROM "public"."company_users"
+  WHERE "user_id" = v_user_id
+  ORDER BY "date_associated", "id"
+  LIMIT 1;
+
+  IF FOUND THEN
+    RETURN v_company_id;
+  END IF;
+
+  RETURN "public"."create_personal_company"(v_user_id, v_first_name);
+END;
+$$;
+
+ALTER FUNCTION "public"."ensure_my_company"() OWNER TO "postgres";
+
+REVOKE EXECUTE ON FUNCTION "public"."ensure_my_company"() FROM PUBLIC, "anon";
+GRANT EXECUTE ON FUNCTION "public"."ensure_my_company"() TO "authenticated";
+
+COMMENT ON FUNCTION "public"."ensure_my_company"() IS 'Returns the caller''s company id, creating a personal company with an Admin company_users row first if the caller has none. Safe to call twice: the second call returns the same company. Returns NULL if the caller has no users row yet. The caller is found through auth.uid() and users.credential_id.';
