@@ -1,5 +1,5 @@
 begin;
-select plan(34);
+select plan(46);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -32,6 +32,15 @@ SELECT col_type_is('public', 'cost_items', 'duration', 'numeric(10,2)', 'cost_it
 SELECT col_type_is('public', 'cost_items', 'daily_rate', 'numeric(18,4)', 'cost_items.daily_rate is numeric(18,4)');
 SELECT col_type_is('public', 'cost_items', 'job_amount', 'numeric(18,4)', 'cost_items.job_amount is numeric(18,4)');
 SELECT col_type_is('public', 'cost_items', 'delivery_fee', 'numeric(18,4)', 'cost_items.delivery_fee is numeric(18,4)');
+
+-- CA-1182: Material v2 columns
+SELECT has_column('public', 'cost_items', 'waste_percent', 'cost_items.waste_percent column exists');
+SELECT has_column('public', 'cost_items', 'quantity_provenance', 'cost_items.quantity_provenance column exists');
+SELECT has_column('public', 'cost_items', 'calculator_formula', 'cost_items.calculator_formula column exists');
+SELECT col_type_is('public', 'cost_items', 'waste_percent', 'numeric(5,2)', 'cost_items.waste_percent is numeric(5,2)');
+SELECT col_type_is('public', 'cost_items', 'quantity_provenance', 'quantity_provenance_enum', 'cost_items.quantity_provenance is quantity_provenance_enum');
+SELECT col_type_is('public', 'cost_items', 'calculator_formula', 'text', 'cost_items.calculator_formula is text');
+SELECT enum_has_labels('public', 'quantity_provenance_enum', ARRAY['manual', 'from_calculator']);
 
 DO $$
 DECLARE
@@ -142,6 +151,46 @@ SELECT throws_like(
      VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'equipment', 'Negative-day rental', -1, '{}', 10.00, 'USD') $$,
   '%cost_items_duration_half_day_check%',
   'duration = -1 violates the half-day check'
+);
+
+-- CA-1182: a material item round-trips its v2 fields, including the shared rate_status
+INSERT INTO cost_items (
+  id, estimate_id, item_type, item_name, waste_percent, quantity_provenance,
+  calculator_formula, rate_status, calculation, item_total_cost, currency
+) VALUES (
+  'c50e8400-e29b-41d4-a716-446655440003', 'a50e8400-e29b-41d4-a716-446655440098', 'material',
+  'Drywall sheet', 10.50, 'from_calculator', '47.24in x 94.49in', 'sample_rate_unverified', '{}', 156.00, 'USD'
+);
+
+SELECT is(
+  (SELECT waste_percent FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440003'),
+  10.50::numeric(5,2),
+  'Material item round-trips waste_percent'
+);
+
+SELECT is(
+  (SELECT quantity_provenance::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440003'),
+  'from_calculator',
+  'Material item round-trips quantity_provenance'
+);
+
+SELECT is(
+  (SELECT calculator_formula FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440003'),
+  '47.24in x 94.49in',
+  'Material item round-trips calculator_formula'
+);
+
+SELECT is(
+  (SELECT rate_status::text FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440003'),
+  'sample_rate_unverified',
+  'rate_status is shared: a material item stores it too'
+);
+
+SELECT throws_like(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, quantity_provenance, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'Bad label', 'fromCalculator', '{}', 10.00, 'USD') $$,
+  '%quantity_provenance_enum%',
+  'quantity_provenance rejects the camelCase label'
 );
 
 select * from finish();
