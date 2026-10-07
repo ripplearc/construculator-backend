@@ -39,7 +39,14 @@ The `cost_items` table stores individual line items within cost estimates. Each 
 - `daily_rate` - Rate per day for day-priced equipment (decimal 18,4)
 - `job_amount` - Flat amount for job-priced equipment (decimal 18,4)
 - `delivery_fee` - Delivery fee; NULL means unquoted (decimal 18,4)
-- `rate_status` - Enum: 'sample_rate_unverified', 'own_rate_unconfirmed', 'own_rate_confirmed', or 'missing'
+
+### Shared Fields
+- `rate_status` - Enum: 'sample_rate_unverified', 'own_rate_unconfirmed', 'own_rate_confirmed', or 'missing'. Shared by every item type. It has no equipment prefix and no check constraint ties it to `item_type`, so Material and Labor rows use it too. CA-1182 confirmed this, so Material has no column of its own for it. CA-1156 added the column.
+
+### Material v2 Fields
+- `waste_percent` - Waste allowance in percent (decimal 5,2). NULL means unset, which is different from an explicit 0
+- `quantity_provenance` - Enum: 'manual' or 'from_calculator'. Says where the quantity came from
+- `calculator_formula` - Text. The formula the calculator produced, shown as "From calculator - [formula]". The app clears it when the quantity is edited by hand
 
 ### Metadata
 - `created_at` - Creation timestamp
@@ -55,6 +62,7 @@ Three types of cost items are supported:
 - Physical products/supplies
 - Uses: `unit_price`, `quantity`, `unit_measurement`
 - Optional: `brand`, `product_link`
+- v2: `waste_percent`, `quantity_provenance`, `calculator_formula`, `rate_status`
 
 **Labor**:
 - Worker costs
@@ -147,7 +155,7 @@ Users with access to a cost estimate can:
 
 3. `trigger_log_cost_item_edited` - AFTER UPDATE
    - Logs field changes when any tracked field is modified
-   - Tracks 23 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, all labor fields, and all equipment fields
+   - Tracks 26 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, all labor fields, all equipment fields, and all Material v2 fields
 
 4. `trigger_log_cost_item_removed` - AFTER UPDATE
    - Logs removal activity when item is soft deleted

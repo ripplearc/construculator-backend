@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS "public"."cost_items" (
     "job_amount" numeric(18,4),
     "delivery_fee" numeric(18,4),
     "rate_status" "public"."rate_status_enum",
+    "waste_percent" numeric(5,2),
+    "quantity_provenance" "public"."quantity_provenance_enum",
+    "calculator_formula" text,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "deleted_at" timestamp with time zone
