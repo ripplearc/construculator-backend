@@ -245,3 +245,22 @@ CREATE TYPE "public"."equipment_pricing_method_enum" AS ENUM (
 
 
 ALTER TYPE "public"."equipment_pricing_method_enum" OWNER TO "postgres";
+
+
+-- The eight calculator trade stores (UX Design Doc term 2.16): which store a
+-- user_calculator_stores row belongs to. The app's row mapper reads the
+-- row's "values" object by this kind.
+
+CREATE TYPE "public"."calculator_store_kind_enum" AS ENUM (
+    'sheet_size',
+    'masonry_piece',
+    'footing_section',
+    'on_centre_spacing',
+    'fence_config',
+    'rate',
+    'waste',
+    'density'
+);
+
+
+ALTER TYPE "public"."calculator_store_kind_enum" OWNER TO "postgres";
