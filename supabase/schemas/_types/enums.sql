@@ -185,7 +185,15 @@ CREATE TYPE "public"."cost_estimation_activity_type_enum" AS ENUM (
     'cost_file_uploaded',
     'cost_file_deleted',
     'attachment_added',
-    'attachment_removed'
+    'attachment_removed',
+    'cost_estimation_sent',
+    'cost_estimation_send_failed',
+    'cost_estimation_opened',
+    'cost_estimation_revoked',
+    'cost_estimation_approved',
+    'cost_estimation_changes_requested',
+    'cost_estimation_pdf_shared',
+    'cost_file_updated'
 );
 
 ALTER TYPE "public"."cost_estimation_activity_type_enum" OWNER TO "postgres";
