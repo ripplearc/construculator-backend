@@ -101,6 +101,15 @@ CREATE TYPE "public"."rate_status_enum" AS ENUM (
 ALTER TYPE "public"."rate_status_enum" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."quantity_provenance_enum" AS ENUM (
+    'manual',
+    'from_calculator'
+);
+
+
+ALTER TYPE "public"."quantity_provenance_enum" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."markup_type_enum" AS ENUM (
     'overall',
     'granular'
