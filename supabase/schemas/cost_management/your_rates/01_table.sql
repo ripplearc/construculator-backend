@@ -7,12 +7,12 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     "category" "public"."cost_item_type_enum" NOT NULL,
     "item_name" character varying(255) NOT NULL,
     -- The name as the contractor's other saves are matched against it: lower
-    -- case, outer spaces trimmed, inner runs of whitespace collapsed to one
-    -- space ("Names match without regard to capital letters or extra
+    -- case, runs of whitespace (tabs, new lines, non-breaking spaces) collapsed to
+    -- one space, then outer spaces trimmed ("Names match without regard to capital letters or extra
     -- spaces", storyboard CUJ 6). item_name keeps the user's own spelling for
     -- display. A stored generated column, not an expression index, so the
     -- unique constraint below can still be an upsert target.
-    "item_name_key" "text" GENERATED ALWAYS AS (lower(regexp_replace(btrim("item_name"), '\s+', ' ', 'g'))) STORED NOT NULL,
+    "item_name_key" "text" GENERATED ALWAYS AS (lower(btrim(regexp_replace("item_name", '[\s\u00a0]+', ' ', 'g')))) STORED NOT NULL,
     "rate_amount" numeric(18,4) NOT NULL,
     "rate_currency" character varying(20) NOT NULL,
     -- Free text, not a Postgres enum: matches cost_items.unit_measurement,
@@ -67,7 +67,7 @@ ALTER TABLE ONLY "public"."your_rates"
 
 -- Row rules, so another client cannot save rows the app never would.
 ALTER TABLE ONLY "public"."your_rates"
-    ADD CONSTRAINT "your_rates_item_name_not_blank" CHECK (length(btrim("item_name")) > 0),
+    ADD CONSTRAINT "your_rates_item_name_not_blank" CHECK (length("item_name_key") > 0),
     ADD CONSTRAINT "your_rates_rate_amount_not_negative" CHECK ("rate_amount" >= 0),
     ADD CONSTRAINT "your_rates_rate_currency_not_blank" CHECK (length(btrim("rate_currency")) > 0),
     ADD CONSTRAINT "your_rates_equipment_method_equipment_only" CHECK ("equipment_method" IS NULL OR "category" = 'equipment');

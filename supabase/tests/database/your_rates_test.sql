@@ -10,7 +10,7 @@ BEGIN;
 -- shared updated_at trigger, the EXECUTE rights on the membership helper, an
 -- ON CONFLICT upsert with a NULL label, and one user in two companies.
 
-SELECT plan(47);
+SELECT plan(50);
 
 -- ============================================================
 -- Shape
@@ -238,6 +238,22 @@ SELECT throws_ok(
   'The same name with spaces around it collides with the saved Day row'
 );
 
+SELECT throws_ok(
+  format($$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', %L, 160.0000, 'USD', 'day', 'day', now())$$, E'Mini excavator\n'),
+  '23505',
+  NULL,
+  'The same name with a trailing new line collides with the saved Day row'
+);
+
+SELECT throws_ok(
+  format($$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', %L, 160.0000, 'USD', 'day', 'day', now())$$, E'\u00a0Mini\u00a0excavator'),
+  '23505',
+  NULL,
+  'The same name with non-breaking spaces collides with the saved Day row'
+);
+
 SELECT is(
   (SELECT item_name FROM public.your_rates
      WHERE company_id = '77777777-7777-7777-7777-777777777777' AND item_name_key = 'mini excavator' AND equipment_method = 'job'),
@@ -257,6 +273,14 @@ SELECT throws_ok(
   '23514',
   NULL,
   'A blank item_name is rejected'
+);
+
+SELECT throws_ok(
+  format($$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'material', %L, 1.0000, 'USD', now())$$, E'\t'),
+  '23514',
+  NULL,
+  'An item_name of only a tab is rejected'
 );
 
 SELECT throws_ok(

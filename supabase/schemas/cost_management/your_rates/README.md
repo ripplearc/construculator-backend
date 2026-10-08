@@ -21,8 +21,9 @@ but that grouping can now hold several entries, disambiguated by
 - `category` - `cost_item_type_enum`: `'material'`, `'labor'`, or
   `'equipment'` (reused directly, not a new enum)
 - `item_name` - Display name for the item, kept in the contractor's own spelling
-- `item_name_key` - Generated and stored: `item_name` in lower case, outer
-  spaces trimmed, inner whitespace collapsed to one space. The collision
+- `item_name_key` - Generated and stored: `item_name` in lower case, every run of
+  whitespace (spaces, tabs, new lines, non-breaking spaces) collapsed to one
+  space, then trimmed. The collision
   constraint compares this column, so `Mini excavator`, `MINI  EXCAVATOR` and
   ` mini excavator ` are one name ("Names match without regard to capital
   letters or extra spaces", storyboard CUJ 6). Never written by a client
@@ -116,7 +117,7 @@ building it.
 
 ## Row rules (CHECK constraints)
 
-- `your_rates_item_name_not_blank` - `item_name` is not empty or only spaces
+- `your_rates_item_name_not_blank` - `item_name_key` is not empty, so a name of only spaces, tabs or new lines is refused
 - `your_rates_rate_amount_not_negative` - `rate_amount >= 0`
 - `your_rates_rate_currency_not_blank` - `rate_currency` is not empty or only spaces
 - `your_rates_equipment_method_equipment_only` - `equipment_method` is only
