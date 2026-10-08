@@ -8,9 +8,10 @@
 -- not syncing" rather than as a bug. The sync stream in
 -- powersync/sync-config.yaml filters on the same claim.
 --
--- Delete from the app is a soft delete (deleted_at set through an UPDATE);
--- the DELETE policy exists so a user can hard-delete their own rows from
--- the SQL editor, and for the same reason nobody else can.
+-- Delete from the app is a soft delete (deleted_at set through an UPDATE).
+-- The DELETE policy lets a signed-in client, an API call or an upload, hard
+-- delete its own rows and nobody else's; the SQL editor runs as postgres
+-- and never passes through it.
 
 ALTER TABLE "public"."user_calculator_stores" ENABLE ROW LEVEL SECURITY;
 

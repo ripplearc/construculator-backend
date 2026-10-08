@@ -12,6 +12,7 @@
 -- reason migrations 41-44 were hand-written). Mirrors
 -- supabase/schemas/_types/enums.sql and
 -- supabase/schemas/calculator/user_calculator_stores/ -- keep them in step.
+-- Label 51: 45 and 46 were taken by your_rates (#57) while this sat open.
 --
 -- Rollback (manual; Supabase migrations are append-only):
 --   DROP TABLE public.user_calculator_stores;
@@ -54,7 +55,10 @@ ALTER TYPE "public"."calculator_store_kind_enum" OWNER TO "postgres";
 
 CREATE TABLE IF NOT EXISTS "public"."user_calculator_stores" (
   "id"           uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
-  "user_id"      uuid NOT NULL REFERENCES "public"."users"("id"),
+  -- Cascades: a trade store is the user's own preference, not an evidence
+  -- log like user_consents, so deleting the account takes its rows with it
+  -- (company_users.user_id cascades for the same reason).
+  "user_id"      uuid NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
   "store_kind"   "public"."calculator_store_kind_enum" NOT NULL,
   -- The entry's fields in the engine's canonical units (whole ticks of
   -- 1/64 inch, hundredths of a pound, percent, dollars), as one JSON object
@@ -67,8 +71,10 @@ CREATE TABLE IF NOT EXISTS "public"."user_calculator_stores" (
   "unit_system"  text NOT NULL,
   "created_at"   timestamptz NOT NULL DEFAULT (now()),
   "updated_at"   timestamptz NOT NULL DEFAULT (now()),
-  -- Soft delete: the app sets this through an UPDATE so that every phone
-  -- hides the row once it syncs; the row itself stays for sync convergence.
+  -- Soft delete: the app sets this through an UPDATE. A deleted seed needs
+  -- a row to stay behind, carrying the seed's key, or the shipped default
+  -- would come back on every phone; user-added rows take the same path so
+  -- delete is one code path in the app.
   "deleted_at"   timestamptz,
 
   CONSTRAINT "user_calculator_stores_unit_system_check"
@@ -88,11 +94,19 @@ ALTER TABLE "public"."user_calculator_stores" OWNER TO "postgres";
 -- Indexes for user_calculator_stores
 
 -- The one read the app makes: a user's live rows of one store. Partial on
--- deleted_at so soft-deleted rows cost nothing here; the sync stream reads
--- them through the primary key.
+-- deleted_at so soft-deleted rows cost nothing here; PowerSync reads the
+-- table from replicated state, not through this index.
 CREATE INDEX IF NOT EXISTS "user_calculator_stores_user_kind_idx"
   ON "public"."user_calculator_stores" ("user_id", "store_kind")
   WHERE "deleted_at" IS NULL;
+
+-- One live row per changed seed. Two phones that edit the same default while
+-- offline would otherwise each insert a row, and the two never merge. Keyed
+-- on unit_system too because sheet sizes are seeded per system. Rows the
+-- user adds themselves carry no "seed" key and stay unrestricted.
+CREATE UNIQUE INDEX IF NOT EXISTS "user_calculator_stores_live_seed_key"
+  ON "public"."user_calculator_stores" ("user_id", "store_kind", "unit_system", ("values"->>'seed'))
+  WHERE "deleted_at" IS NULL AND "values" ? 'seed';
 
 -- ============================================================
 -- RLS
@@ -108,9 +122,10 @@ CREATE INDEX IF NOT EXISTS "user_calculator_stores_user_kind_idx"
 -- not syncing" rather than as a bug. The sync stream in
 -- powersync/sync-config.yaml filters on the same claim.
 --
--- Delete from the app is a soft delete (deleted_at set through an UPDATE);
--- the DELETE policy exists so a user can hard-delete their own rows from
--- the SQL editor, and for the same reason nobody else can.
+-- Delete from the app is a soft delete (deleted_at set through an UPDATE).
+-- The DELETE policy lets a signed-in client, an API call or an upload, hard
+-- delete its own rows and nobody else's; the SQL editor runs as postgres
+-- and never passes through it.
 
 ALTER TABLE "public"."user_calculator_stores" ENABLE ROW LEVEL SECURITY;
 
@@ -138,9 +153,10 @@ CREATE POLICY "user_calculator_stores_delete_policy" ON "public"."user_calculato
 
 -- Triggers for user_calculator_stores
 
--- updated_at is the conflict rule: PowerSync uploads a row with its
--- updated_at and the newer write stands (last write wins per row), so the
--- server stamps it on every UPDATE rather than trusting the client's clock.
+-- The conflict rule is "the last upload to arrive wins": the server sets
+-- updated_at on every UPDATE, whatever the phone sent, so the column records
+-- when the server applied the write rather than what a phone's clock said.
+-- INSERT keeps the phone's values; a new row has nothing to conflict with.
 CREATE OR REPLACE TRIGGER "set_user_calculator_stores_updated_at"
   BEFORE UPDATE ON "public"."user_calculator_stores"
   FOR EACH ROW EXECUTE FUNCTION "public"."set_current_timestamp_updated_at"();

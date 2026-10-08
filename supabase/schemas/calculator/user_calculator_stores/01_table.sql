@@ -12,7 +12,10 @@
 
 CREATE TABLE IF NOT EXISTS "public"."user_calculator_stores" (
   "id"           uuid PRIMARY KEY DEFAULT (gen_random_uuid()),
-  "user_id"      uuid NOT NULL REFERENCES "public"."users"("id"),
+  -- Cascades: a trade store is the user's own preference, not an evidence
+  -- log like user_consents, so deleting the account takes its rows with it
+  -- (company_users.user_id cascades for the same reason).
+  "user_id"      uuid NOT NULL REFERENCES "public"."users"("id") ON DELETE CASCADE,
   "store_kind"   "public"."calculator_store_kind_enum" NOT NULL,
   -- The entry's fields in the engine's canonical units (whole ticks of
   -- 1/64 inch, hundredths of a pound, percent, dollars), as one JSON object
@@ -25,8 +28,10 @@ CREATE TABLE IF NOT EXISTS "public"."user_calculator_stores" (
   "unit_system"  text NOT NULL,
   "created_at"   timestamptz NOT NULL DEFAULT (now()),
   "updated_at"   timestamptz NOT NULL DEFAULT (now()),
-  -- Soft delete: the app sets this through an UPDATE so that every phone
-  -- hides the row once it syncs; the row itself stays for sync convergence.
+  -- Soft delete: the app sets this through an UPDATE. A deleted seed needs
+  -- a row to stay behind, carrying the seed's key, or the shipped default
+  -- would come back on every phone; user-added rows take the same path so
+  -- delete is one code path in the app.
   "deleted_at"   timestamptz,
 
   CONSTRAINT "user_calculator_stores_unit_system_check"

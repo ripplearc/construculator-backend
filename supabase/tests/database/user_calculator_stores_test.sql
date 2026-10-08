@@ -2,13 +2,15 @@ BEGIN;
 
 -- Tests for CA-1076: user_calculator_stores, the calculator's trade stores
 -- that follow the user's account. Covers the shape (columns, the store-kind
--- enum's wire values, the two CHECKs, the partial index), the updated_at
--- trigger the conflict rule rests on, the users FK's refusal to cascade, the
--- publication membership the sync stream depends on, and the RLS posture:
--- own rows only on every verb, keyed on the internal_user_id JWT claim rather
--- than auth.uid(), and nothing at all without the claim.
+-- enum's wire values, the two CHECKs, the partial index, the one-live-row-
+-- per-seed unique index), the updated_at trigger the conflict rule rests on,
+-- the users FK cascading on account deletion, the publication membership the
+-- sync stream depends on, and the RLS posture: own rows only on every verb,
+-- keyed on the internal_user_id JWT claim rather than auth.uid(), nothing at
+-- all without the claim, and nothing for anon. The updated_at stamp and the
+-- soft delete run as authenticated, the path the app takes.
 
-SELECT plan(29);
+SELECT plan(37);
 
 -- ============================================================
 -- Shape
@@ -37,15 +39,21 @@ SELECT has_index(
   'The (user_id, store_kind) partial index exists'
 );
 
--- The users FK does not cascade: 'a' is NO ACTION, like every other users(id)
--- FK in this repo. The behaviour itself is exercised below.
+SELECT has_index(
+  'public', 'user_calculator_stores', 'user_calculator_stores_live_seed_key',
+  'The one-live-row-per-seed unique index exists'
+);
+
+-- The users FK cascades ('c'): a trade store is the user's own preference,
+-- so deleting the account takes its rows with it, as company_users does.
+-- The behaviour itself is exercised at the end.
 SELECT is(
   (SELECT confdeltype FROM pg_constraint
      WHERE conrelid = 'public.user_calculator_stores'::regclass
        AND contype = 'f'
        AND confrelid = 'public.users'::regclass),
-  'a'::"char",
-  'The users FK does NOT cascade on delete'
+  'c'::"char",
+  'The users FK cascades on delete'
 );
 
 -- ============================================================
@@ -128,39 +136,33 @@ SELECT throws_ok(
 );
 
 -- ============================================================
--- updated_at trigger: the conflict rule (last write wins per row) rests on
--- the server stamping updated_at on every UPDATE.
+-- One live row per changed seed
 -- ============================================================
 
-UPDATE public.user_calculator_stores
-   SET updated_at = now() - interval '1 day'
- WHERE id = 'a0000000-0000-0000-0000-000000000001';
-
-SELECT ok(
-  (SELECT updated_at >= now() - interval '1 minute'
-     FROM public.user_calculator_stores
-    WHERE id = 'a0000000-0000-0000-0000-000000000001'),
-  'updated_at is stamped by the server on UPDATE, whatever the client wrote'
-);
-
--- Soft delete is an UPDATE: the row stays.
-UPDATE public.user_calculator_stores
-   SET deleted_at = now()
- WHERE id = 'a0000000-0000-0000-0000-000000000002';
-
-SELECT isnt_empty(
-  $$SELECT 1 FROM public.user_calculator_stores
-     WHERE id = 'a0000000-0000-0000-0000-000000000002' AND deleted_at IS NOT NULL$$,
-  'A soft-deleted row stays in the table with deleted_at set'
-);
-
--- The behavioural half of the confdeltype assertion above.
 SELECT throws_ok(
-  $$DELETE FROM public.users WHERE id = '33333333-3333-3333-3333-333333333333'$$,
-  '23503',
+  $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 14}', 'imperial')$$,
+  '23505',
   NULL,
-  'Deleting a user who has store rows is refused, not cascaded'
+  'A second live row for the same seed, store and unit system is refused'
 );
+
+SELECT lives_ok(
+  $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 14}', 'metric')$$,
+  'The same seed under the other unit system is a different row'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system) VALUES
+    ('11111111-1111-1111-1111-111111111111', 'rate', '{"rate": 14}', 'imperial'),
+    ('11111111-1111-1111-1111-111111111111', 'rate', '{"rate": 15}', 'imperial')$$,
+  'Rows without a seed key are not restricted'
+);
+
+DELETE FROM public.user_calculator_stores
+ WHERE user_id = '11111111-1111-1111-1111-111111111111'
+   AND id NOT IN ('a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002');
 
 -- ============================================================
 -- RLS — own rows only, via the internal_user_id claim
@@ -181,6 +183,41 @@ SELECT is(
   2::bigint,
   'A user sees their own store rows and only those'
 );
+
+-- The conflict rule (last upload to arrive wins) rests on the server
+-- stamping updated_at on every UPDATE. Run as the app does: through the
+-- UPDATE policy, not as the table owner.
+UPDATE public.user_calculator_stores
+   SET updated_at = now() - interval '1 day'
+ WHERE id = 'a0000000-0000-0000-0000-000000000001';
+
+SELECT ok(
+  (SELECT updated_at >= now() - interval '1 minute'
+     FROM public.user_calculator_stores
+    WHERE id = 'a0000000-0000-0000-0000-000000000001'),
+  'updated_at is stamped by the server on UPDATE, whatever the client wrote'
+);
+
+-- Soft delete is an UPDATE through the same policy: the row stays.
+UPDATE public.user_calculator_stores
+   SET deleted_at = now()
+ WHERE id = 'a0000000-0000-0000-0000-000000000002';
+
+SELECT isnt_empty(
+  $$SELECT 1 FROM public.user_calculator_stores
+     WHERE id = 'a0000000-0000-0000-0000-000000000002' AND deleted_at IS NOT NULL$$,
+  'A soft-deleted row stays in the table with deleted_at set'
+);
+
+-- A soft-deleted row frees its seed key for a new live row.
+SELECT lives_ok(
+  $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 16}', 'imperial')$$,
+  'A soft-deleted seed row no longer blocks a new live row for that seed'
+);
+
+DELETE FROM public.user_calculator_stores
+ WHERE "values"->>'rate' = '16';
 
 SELECT lives_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
@@ -261,6 +298,24 @@ SELECT throws_ok(
   'Without the claim a user cannot write a row, even their own'
 );
 
+-- anon has no policy at all.
+SET LOCAL ROLE anon;
+SELECT set_config('request.jwt.claims', '{"role": "anon"}', true);
+
+SELECT is(
+  (SELECT count(*) FROM public.user_calculator_stores),
+  0::bigint,
+  'anon sees no rows'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'waste', '{"percent": 10}', 'imperial')$$,
+  '42501',
+  NULL,
+  'anon cannot insert a row'
+);
+
 RESET ROLE;
 
 -- The other user's row was never touched by the owner's UPDATE or DELETE.
@@ -269,6 +324,19 @@ SELECT is(
      WHERE user_id = '33333333-3333-3333-3333-333333333333'),
   'gravel',
   'Another user''s row is untouched by the owner''s writes'
+);
+
+-- The behavioural half of the confdeltype assertion: deleting the account
+-- (auth.users cascades to users, which cascades here) removes the rows.
+SELECT lives_ok(
+  $$DELETE FROM auth.users WHERE id = '44444444-4444-4444-4444-444444444444'$$,
+  'Deleting a user who has store rows succeeds'
+);
+
+SELECT is_empty(
+  $$SELECT 1 FROM public.user_calculator_stores
+     WHERE user_id = '33333333-3333-3333-3333-333333333333'$$,
+  'The deleted user''s store rows went with the account'
 );
 
 SELECT * FROM finish();
