@@ -96,6 +96,21 @@ SELECT check_email_exists('user@example.com');
 -- Returns: true or false
 ```
 
+### `get_my_company_id()`
+**Purpose**: Returns the signed-in caller's own company id, or `NULL` if the caller has none.
+
+**Security**:
+- `SECURITY DEFINER`, `search_path` set to `public`
+- Finds the caller through `auth.uid()`, `users.credential_id`, `users.id` and `company_users`
+- Does not use the `internal_user_id` token claim, so it works straight after sign-up
+- `EXECUTE` is revoked from `PUBLIC` and `anon`, and granted to `authenticated`
+- Needed because `company_users` has RLS on and no policies
+
+**Example**:
+```sql
+SELECT get_my_company_id();
+```
+
 ## Triggers
 
 ### `trigger_update_users_updated_at`
@@ -103,6 +118,27 @@ SELECT check_email_exists('user@example.com');
 - Listens to `BEFORE UPDATE` on `users` table
 - Executes shared `set_current_timestamp_updated_at()` function
 - Guarantees `updated_at` matches the exact time of the change
+
+### `trigger_create_personal_company`
+**Purpose**: Gives every new user one personal company.
+- Listens to `AFTER INSERT` on `users` table
+- Executes `create_personal_company_for_new_user()`
+- Otherwise creates one `companies` row and one Admin `company_users` row
+- Company name is `first_name` plus "'s company". A first name that is empty or only spaces, tabs, new lines or no-break/zero-width spaces gives "My company". Duplicate names are accepted
+- Company email is `hidden-<company_id>@internal.construculator.app` and phone is `hidden-<company_id>`. These are placeholders for the required columns
+- If any step fails, the whole `users` insert rolls back
+- The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
+- The `Admin` row in `roles` must exist, or the insert fails. Migration `20261004120000_48_personal_company_trigger.sql` creates it, with the same id, level and description as the seeder
+- `Admin` is a project role (`context_type = 'project'`). It is reused on purpose for company membership and found by `role_name`. A separate company role would need a change to the trigger
+
+### `trigger_delete_empty_company`
+**Purpose**: Lets a user be deleted even though the trigger above gave them a company.
+- Listens to `AFTER DELETE` on `company_users` table
+- Executes `delete_company_when_last_member_leaves()`
+- Deletes the company when no `company_users` row is left, unless any row still points at it (a project, a team, `your_rates`, or any later table). The delete is tried and a foreign key refusal is caught, so no list of tables has to be kept
+- Locks the company row first (`FOR UPDATE`), so two sessions leaving or joining at once wait for each other
+- `company_users.user_id` is `ON DELETE CASCADE`, so deleting a `users` row (or the `auth.users` account, which cascades to `users`) removes the membership first
+- The function is `SECURITY DEFINER` with `search_path` set to `public`. Clients cannot execute it
 
 ## Views
 
@@ -160,13 +196,27 @@ auth.uid() = credential_id
 auth.uid() = credential_id
 ```
 
-**Note**: INSERT is intentionally excluded from RLS. User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users` to prevent duplicate profile rows. Cross-user reads (e.g., viewing teammates) via `user_profiles` are deferred — the current `users_select_own` policy means the view only returns the caller's own row under `SECURITY INVOKER`. A separate policy will be introduced when team-based access is implemented.
+### Owner Policy
+**Name**: `users_owner_full_access` (migration `20251218175536_RLS_07_users_table_rules.sql`)
+
+**Applies to**: Authenticated users
+
+**Access**: ALL (select, insert, update, delete)
+
+**Rule**: Users can act only on their own row. Both the read check and the write check are:
+```sql
+auth.uid() = credential_id
+```
+
+**Note**: The app inserts the profile row itself during account creation, and this policy allows it. No trigger on `auth.users` creates the profile. Cross-user reads (e.g., viewing teammates) via `user_profiles` are deferred. The owner policy means the view only returns the caller's own row under `SECURITY INVOKER`. A separate policy will be introduced when team-based access is implemented.
+
+A user can delete their own row. The `company_users` row goes with it, and the personal company is removed if no one else is a member and no project or team uses it (see `trigger_delete_empty_company`).
 
 ## Usage Examples
 
 ### Creating a New User Profile
 
-User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users`, not through open client-side RLS. Direct `INSERT` on the `users` table is not permitted via RLS to prevent duplicate profiles.
+The app inserts the profile row itself during account creation. The `users_owner_full_access` policy allows the insert when `credential_id` matches `auth.uid()`. The `AFTER INSERT` trigger then creates the user's personal company (see Triggers).
 
 ### Updating User Profile
 ```sql
@@ -251,9 +301,8 @@ WHERE id = 'user-uuid';
 ## Best Practices
 
 ### Profile Creation
-- User profile creation is handled by a trusted `AFTER INSERT` trigger on `auth.users`
-- Never expose a direct INSERT path through client-side RLS to prevent duplicate profiles
-- Ensure `credential_id` matches `auth.uid()`
+- The app inserts the profile row itself. The insert is allowed only when `credential_id` matches `auth.uid()`
+- The `AFTER INSERT` trigger on `users` creates the personal company in the same transaction
 
 ### Email Validation
 - Check existence before account creation
@@ -280,6 +329,7 @@ WHERE id = 'user-uuid';
 
 See test files:
 - `supabase/tests/functions/check_email_exists_test.sql`
+- `supabase/tests/database/personal_company_trigger_test.sql`
 
 ## Migration Notes
 
@@ -287,4 +337,6 @@ See test files:
 - `credential_id -> auth.users(id)` FK (`ON DELETE CASCADE`) added under CA-995, closing the gap where a hand-inserted `users` row could point at a nonexistent auth account
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
+- Personal company trigger, `get_my_company_id()`, `ON DELETE CASCADE` on `company_users.user_id` and the empty company trigger added in migration `20261004120000_48_personal_company_trigger.sql`
+- This migration has a later timestamp than the migrations in backend PRs #57 and #58. If it is pushed to a remote database first, those two need `supabase db push --include-all`
 - View created in migration `20251218175411_create_user_profile_view.sql`
