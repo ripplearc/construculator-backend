@@ -29,7 +29,12 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     -- is not defaulted to now().
     "saved_at" timestamp with time zone NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    -- Client-supplied, like saved_at. The last time a cost line was added with
+    -- this rate (storyboard CUJ 6, "Used label"). NULL until the first use, so
+    -- the app can say "Saved ..." for a rate that was never added. Added by
+    -- migration 49, so it is the last column.
+    "last_used_at" timestamp with time zone
 );
 
 
