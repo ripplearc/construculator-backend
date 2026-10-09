@@ -295,6 +295,7 @@ npx supabase test db
 | `seeded_auth_user_test` | The seeded test user's GoTrue credential is complete and usable for sign-in |
 | `consent_versions_test` | Consent version constraints, the `current_consent_versions` view's in-force rules, and read-only RLS |
 | `user_consents_test` | Append-only consent log: the deliberately absent constraints, `version >= 0` for withdrawals, the one-sided `recorded_at` bound, and own-rows-only RLS |
+| `user_calculator_stores_test` | The calculator's trade stores: shape, the store-kind enum, one live row per changed seed, server-stamped `updated_at`, soft delete, cascade from `users`, PowerSync publication membership, and owner-only RLS on every verb |
 
 > Tests are **required to pass** on every PR — CI will block merge on failure.
 

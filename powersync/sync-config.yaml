@@ -166,3 +166,21 @@ streams:
              created_at, updated_at
       FROM your_rates
       WHERE company_id IN (SELECT id FROM accessible_companies)
+
+  # ── THE USER'S CALCULATOR TRADE STORES ──────────────────────────
+  # Same filter as user_consents: internal_user_id straight off the JWT.
+  # user_calculator_stores_select_policy is `user_id = jwt_internal_user_id()`
+  # (schemas/calculator/user_calculator_stores/03_rls.sql), the same claim
+  # auth.parameter reads here. PowerSync bypasses RLS, so this WHERE clause
+  # is what keeps one user's rates and sheet sizes off another user's phone.
+  #
+  # Only user-added or changed rows live in the table; the seeds ship in the
+  # app and are laid over at read time. deleted_at is synced so every phone
+  # hides the same rows. A handful of rows per user, so auto_subscribe.
+  user_calculator_stores:
+    auto_subscribe: true
+    query: |
+      SELECT id, user_id, store_kind, "values", unit_system,
+             created_at, updated_at, deleted_at
+      FROM user_calculator_stores
+      WHERE user_id = auth.parameter('$.app_metadata.internal_user_id')
