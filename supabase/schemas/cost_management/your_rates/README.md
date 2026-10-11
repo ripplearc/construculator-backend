@@ -28,6 +28,12 @@ but that grouping can now hold several entries, disambiguated by
   ` mini excavator ` are one name ("Names match without regard to capital
   letters or extra spaces", storyboard CUJ 6). Never written by a client
 
+- `entry_label_key` - Generated and stored: `entry_label` built like
+  `item_name_key` (lower case, runs of whitespace collapsed to one space,
+  trimmed), and `NULL` when nothing is left, so a label of only spaces counts as
+  no label. The collision constraint compares this column. Never written by a
+  client, and not in the `user_rates` stream: the phone builds its own key
+
 ### Rate Fields
 - `rate_amount` - `numeric(18,4)`, mirrors `cost_items.unit_price`
 - `rate_currency` - `character varying(20)`, mirrors `cost_items.currency`
@@ -76,8 +82,9 @@ collision case below.
 Saving an entry:
 - No existing row in that `(company_id, category, item_name_key, equipment_method)` grouping →
   always succeeds, inserts a new row (with or without `entry_label`).
-- An existing row in that grouping has the **exact same** `entry_label`
-  (including both `NULL`) → update that row in place (silent overwrite).
+- An existing row in that grouping has the **same label** (same
+  `entry_label_key`, so capital letters and extra spaces do not count;
+  including both `NULL`) → update that row in place (silent overwrite).
 - No existing row matches the label, and the incoming `entry_label` is
   `NULL` → **rejected** (two unlabeled Equipment rates under the same item
   name is the ticket's own rejection case).
@@ -89,14 +96,14 @@ a separate PR) — it is query-then-decide application logic, not something
 the database can express as a single constraint. What this schema provides
 is the safety net beneath it: `your_rates_company_category_name_method_label_key`
 (see `01_table.sql`), a `UNIQUE NULLS NOT DISTINCT` constraint on
-`(company_id, category, item_name_key, equipment_method, entry_label)`. A plain
+`(company_id, category, item_name_key, equipment_method, entry_label_key)`. A plain
 `UNIQUE` on the same columns would **not** catch
 two `NULL`-labeled rows in the same grouping — Postgres treats `NULL <>
 NULL` for uniqueness — `NULLS NOT DISTINCT` (Postgres 15+) makes two `NULL`s
 count as equal for this constraint instead. The same constraint also serves
 as the grouping lookup index and, being a real column-list constraint rather
 than an expression index, is a valid
-`upsert(onConflict: 'company_id,category,item_name_key,equipment_method,entry_label')` target for
+`upsert(onConflict: 'company_id,category,item_name_key,equipment_method,entry_label_key')` target for
 the "exact same label" update-in-place case — the app does not use upsert
 today, but this keeps the option open without a schema change.
 
@@ -115,12 +122,12 @@ building it.
 
 - `your_rates_pkey` - Primary key on `id`
 - `your_rates_company_category_name_method_label_key` - `UNIQUE NULLS NOT DISTINCT`
-  constraint on `(company_id, category, item_name_key, equipment_method, entry_label)`.
+  constraint on `(company_id, category, item_name_key, equipment_method, entry_label_key)`.
   Enforces the collision constraint above and doubles as the grouping lookup
   index — its leading columns satisfy `(company_id, category, item_name_key)`
   lookups without a separate, redundant index. Postgres builds a unique
   index for it automatically, and it is a valid
-  `onConflict: 'company_id,category,item_name_key,equipment_method,entry_label'` upsert target.
+  `onConflict: 'company_id,category,item_name_key,equipment_method,entry_label_key'` upsert target.
 
 ## Row rules (CHECK constraints)
 

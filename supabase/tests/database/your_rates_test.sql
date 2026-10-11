@@ -3,7 +3,7 @@ BEGIN;
 -- Tests for CA-1145: your_rates, the contractor's personal saved-rate book.
 -- Covers table/PK/FK shape, the UNIQUE NULLS NOT DISTINCT constraint that
 -- enforces the (company_id, category, item_name_key, equipment_method,
--- entry_label) collision rule from Decision 55 -- including the both-NULL case
+-- entry_label_key) collision rule from Decision 55 -- including the both-NULL case
 -- a plain UNIQUE constraint would miss, a Day row and a Job row for one name,
 -- names that differ only by case or spaces, and the CHECK rules -- RLS scoping across two companies via
 -- jwt_user_is_company_member(), the no-claim denial-by-default case, and the
@@ -27,7 +27,7 @@ SELECT ok(
       AND conrelid = 'public.your_rates'::regclass
       AND contype = 'u'
   ),
-  'your_rates has a UNIQUE constraint on (company_id, category, item_name_key, equipment_method, entry_label)'
+  'your_rates has a UNIQUE constraint on (company_id, category, item_name_key, equipment_method, entry_label_key)'
 );
 
 SELECT is(
@@ -198,7 +198,7 @@ SELECT throws_ok(
 SELECT lives_ok(
   $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at)
     VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now())
-    ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label)
+    ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label_key)
     DO UPDATE SET rate_amount = EXCLUDED.rate_amount$$,
   'An upsert on the five key columns replaces the Day row'
 );
@@ -333,9 +333,9 @@ VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Upsert probe', 1.00
 SELECT lives_ok(
   $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
     VALUES ('77777777-7777-7777-7777-777777777777', 'material', 'Upsert probe', 2.0000, 'USD', now())
-    ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label)
+    ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label_key)
     DO UPDATE SET rate_amount = EXCLUDED.rate_amount$$,
-  'An upsert on (company_id, category, item_name_key, equipment_method, entry_label) with a NULL label is accepted'
+  'An upsert on (company_id, category, item_name_key, equipment_method, entry_label_key) with a NULL label is accepted'
 );
 
 SELECT is(
