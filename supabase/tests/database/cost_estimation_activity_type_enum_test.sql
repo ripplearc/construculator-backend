@@ -1,9 +1,9 @@
 BEGIN;
 
 -- Tests for CA-1271: the Send, PDF shared and cost-file-updated kinds of
--- cost_estimation_activity_type_enum. Pins the full label set against the
--- app's toJson() wire values, and checks each new kind can be written to
--- cost_estimate_logs.
+-- cost_estimation_activity_type_enum. Pins the full label set, copied by
+-- hand from the app's toJson() wire values, and checks each new kind can be
+-- written to cost_estimate_logs.
 
 SELECT plan(9);
 
