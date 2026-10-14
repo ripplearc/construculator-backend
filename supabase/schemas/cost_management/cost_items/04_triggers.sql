@@ -46,7 +46,10 @@ WHEN (
     OLD.daily_rate IS DISTINCT FROM NEW.daily_rate OR
     OLD.job_amount IS DISTINCT FROM NEW.job_amount OR
     OLD.delivery_fee IS DISTINCT FROM NEW.delivery_fee OR
-    OLD.rate_status IS DISTINCT FROM NEW.rate_status
+    OLD.rate_status IS DISTINCT FROM NEW.rate_status OR
+    OLD.waste_percent IS DISTINCT FROM NEW.waste_percent OR
+    OLD.quantity_provenance IS DISTINCT FROM NEW.quantity_provenance OR
+    OLD.calculator_formula IS DISTINCT FROM NEW.calculator_formula
   )
 )
 EXECUTE FUNCTION "public"."log_cost_item_edited"();
