@@ -1,5 +1,5 @@
 begin;
-select plan(46);
+select plan(60);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -191,6 +191,143 @@ SELECT throws_like(
      VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'Bad label', 'fromCalculator', '{}', 10.00, 'USD') $$,
   '%quantity_provenance_enum%',
   'quantity_provenance rejects the camelCase label'
+);
+
+-- CA-1182: waste_percent stays between 0 and 100
+SELECT lives_ok(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, waste_percent, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'No waste', 0, '{}', 10.00, 'USD'),
+            ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'All waste', 100, '{}', 10.00, 'USD') $$,
+  'waste_percent accepts 0 and 100'
+);
+
+SELECT throws_like(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, waste_percent, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'Too much waste', 150, '{}', 10.00, 'USD') $$,
+  '%cost_items_waste_percent_range_check%',
+  'waste_percent rejects 150'
+);
+
+SELECT throws_like(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, waste_percent, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'Negative waste', -5, '{}', 10.00, 'USD') $$,
+  '%cost_items_waste_percent_range_check%',
+  'waste_percent rejects -5'
+);
+
+-- CA-1182: a signed-in user reads and writes cost items through RLS. The
+-- checks above run as the table owner, which skips RLS.
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
+
+SELECT lives_ok(
+  $$ INSERT INTO cost_items (id, estimate_id, item_type, item_name, waste_percent, quantity_provenance, calculator_formula, calculation, item_total_cost, currency)
+     VALUES ('c50e8400-e29b-41d4-a716-446655440010', 'a50e8400-e29b-41d4-a716-446655440098', 'material',
+             'RLS drywall', 5, 'from_calculator', '10ft x 4ft', '{}', 20.00, 'USD') $$,
+  'An editor can insert a Material item with the v2 columns'
+);
+
+SELECT is(
+  (SELECT waste_percent FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010'),
+  5.00::numeric(5,2),
+  'An editor can read the item back'
+);
+
+SELECT lives_ok(
+  $$ UPDATE cost_items SET waste_percent = 7 WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  'An editor can update the item'
+);
+
+SELECT is(
+  (SELECT waste_percent FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010'),
+  7.00::numeric(5,2),
+  'The editor update is stored'
+);
+
+-- A viewer holds get_cost_estimations only.
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations"]
+    }
+  }
+}', true);
+
+SELECT isnt_empty(
+  $$ SELECT 1 FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  'A viewer can read the item'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440098', 'material', 'Viewer item', '{}', 10.00, 'USD') $$,
+  '42501',
+  NULL,
+  'A viewer cannot insert an item'
+);
+
+UPDATE cost_items SET waste_percent = 9 WHERE id = 'c50e8400-e29b-41d4-a716-446655440010';
+DELETE FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010';
+
+-- A user with no permission on the project.
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {}
+  }
+}', true);
+
+SELECT is_empty(
+  $$ SELECT 1 FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  'A user with no permission on the project sees no items'
+);
+
+RESET ROLE;
+
+SELECT results_eq(
+  $$ SELECT waste_percent, deleted_at IS NULL FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  $$ VALUES (7.00::numeric(5,2), true) $$,
+  'A viewer can neither update nor delete the item'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"]
+    }
+  }
+}', true);
+
+SELECT lives_ok(
+  $$ DELETE FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  'An editor can delete the item'
+);
+
+SELECT is_empty(
+  $$ SELECT 1 FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  'The deleted item is hidden from the editor'
+);
+
+RESET ROLE;
+
+SELECT isnt(
+  (SELECT deleted_at FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010'),
+  NULL::timestamptz,
+  'The delete is a soft delete'
 );
 
 select * from finish();

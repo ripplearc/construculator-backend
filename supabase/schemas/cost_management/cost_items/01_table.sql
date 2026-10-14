@@ -56,3 +56,7 @@ ALTER TABLE ONLY "public"."cost_items"
 ALTER TABLE ONLY "public"."cost_items"
     ADD CONSTRAINT "cost_items_duration_half_day_check"
       CHECK ("duration" IS NULL OR ("duration" > 0 AND "duration" * 2 = trunc("duration" * 2)));
+
+ALTER TABLE ONLY "public"."cost_items"
+    ADD CONSTRAINT "cost_items_waste_percent_range_check"
+      CHECK ("waste_percent" IS NULL OR "waste_percent" BETWEEN 0 AND 100);

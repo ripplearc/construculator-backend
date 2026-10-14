@@ -18,6 +18,14 @@
 -- quantity_provenance uses snake_case labels, like rate_status_enum. The Dart
 -- QuantityProvenance values are manual and fromCalculator.
 --
+-- A CHECK keeps waste_percent between 0 and 100, the range the storyboard
+-- accepts, so a client other than the app cannot store a value that gives a
+-- wrong total on every phone.
+--
+-- A row can hold a calculator_formula with quantity_provenance 'manual'. The
+-- app clears the formula on a manual edit and reads such a row safely, so the
+-- database does not forbid it.
+--
 -- calculator_formula is plain text: the display string the calculator
 -- produced (for example "47.24in x 94.49in"). The app clears it when the
 -- quantity is edited by hand.
@@ -35,6 +43,7 @@
 -- Rollback (manual; Supabase migrations are append-only): recreate
 -- trigger_log_cost_item_edited without the 3 new columns, then
 --   ALTER TABLE public.cost_items
+--     DROP CONSTRAINT cost_items_waste_percent_range_check,
 --     DROP COLUMN waste_percent,
 --     DROP COLUMN quantity_provenance,
 --     DROP COLUMN calculator_formula;
@@ -52,7 +61,9 @@ ALTER TYPE "public"."quantity_provenance_enum" OWNER TO "postgres";
 ALTER TABLE ONLY "public"."cost_items"
     ADD COLUMN "waste_percent" numeric(5,2),
     ADD COLUMN "quantity_provenance" "public"."quantity_provenance_enum",
-    ADD COLUMN "calculator_formula" text;
+    ADD COLUMN "calculator_formula" text,
+    ADD CONSTRAINT "cost_items_waste_percent_range_check"
+        CHECK ("waste_percent" IS NULL OR "waste_percent" BETWEEN 0 AND 100);
 
 -- Extend trigger_log_cost_item_edited's tracked-columns WHEN clause to cover
 -- the 3 new Material fields, per its doc comment in
