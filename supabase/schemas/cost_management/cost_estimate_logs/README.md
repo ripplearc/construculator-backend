@@ -74,7 +74,7 @@ The `activity` field uses the `cost_estimation_activity_type_enum` enum with the
 **Send Activities:**
 - `cost_estimation_sent` - Estimate was sent to a recipient
 - `cost_estimation_send_failed` - Sending the estimate failed
-- `cost_estimation_opened` - Recipient opened the sent estimate
+- `cost_estimation_opened` - Sent estimate's link was opened for the first time
 - `cost_estimation_revoked` - Sent link was revoked
 - `cost_estimation_approved` - Sender recorded the recipient's approval
 - `cost_estimation_changes_requested` - Sender recorded that the recipient asked for changes
