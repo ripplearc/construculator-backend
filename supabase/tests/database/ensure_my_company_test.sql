@@ -3,7 +3,7 @@ BEGIN;
 -- Tests for CA-1262: ensure_my_company() creates the caller's personal company
 -- when there is none, and is safe to call twice.
 
-SELECT plan(14);
+SELECT plan(18);
 
 INSERT INTO professional_roles (id, name)
 VALUES ('aaaaaaaa-0000-0000-0000-000000000002', 'Ensure Company Test Role');
@@ -21,6 +21,12 @@ INSERT INTO auth.users (
    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'dddddddd-0000-0000-0000-000000000003', 'authenticated', 'authenticated',
    'gina@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+   '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'dddddddd-0000-0000-0000-000000000004', 'authenticated', 'authenticated',
+   'hal@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
+   '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'dddddddd-0000-0000-0000-000000000005', 'authenticated', 'authenticated',
+   'ida@example.com', extensions.crypt('test-fixture-password', extensions.gen_salt('bf')), now(),
    '{"provider": "email", "providers": ["email"]}', '{}', now(), now(), '', '', '', '');
 
 INSERT INTO public.users (id, credential_id, email, first_name, last_name, professional_role, user_preferences)
@@ -30,7 +36,11 @@ VALUES
   ('eeeeeeee-0000-0000-0000-000000000002', 'dddddddd-0000-0000-0000-000000000002',
    'frank@example.com', 'Frank', 'Test', 'aaaaaaaa-0000-0000-0000-000000000002', '{}'),
   ('eeeeeeee-0000-0000-0000-000000000003', 'dddddddd-0000-0000-0000-000000000003',
-   'gina@example.com', '  ', 'Test', 'aaaaaaaa-0000-0000-0000-000000000002', '{}');
+   'gina@example.com', '  ', 'Test', 'aaaaaaaa-0000-0000-0000-000000000002', '{}'),
+  ('eeeeeeee-0000-0000-0000-000000000004', 'dddddddd-0000-0000-0000-000000000004',
+   'hal@example.com', 'Hal', 'Test', 'aaaaaaaa-0000-0000-0000-000000000002', '{}'),
+  ('eeeeeeee-0000-0000-0000-000000000005', 'dddddddd-0000-0000-0000-000000000005',
+   'ida@example.com', 'Ida', 'Test', 'aaaaaaaa-0000-0000-0000-000000000002', '{}');
 
 CREATE TEMP TABLE erin_company AS
   SELECT company_id FROM public.company_users WHERE user_id = 'eeeeeeee-0000-0000-0000-000000000001';
@@ -39,7 +49,12 @@ GRANT SELECT ON erin_company TO authenticated;
 -- Erin and Gina lose the company the signup trigger gave them, like an account
 -- that signed up before the trigger shipped. Frank keeps his.
 DELETE FROM public.company_users
-WHERE user_id IN ('eeeeeeee-0000-0000-0000-000000000001', 'eeeeeeee-0000-0000-0000-000000000003');
+WHERE user_id IN (
+  'eeeeeeee-0000-0000-0000-000000000001',
+  'eeeeeeee-0000-0000-0000-000000000003',
+  'eeeeeeee-0000-0000-0000-000000000004',
+  'eeeeeeee-0000-0000-0000-000000000005'
+);
 DELETE FROM public.companies WHERE id = (SELECT company_id FROM erin_company);
 
 SET LOCAL ROLE authenticated;
@@ -108,6 +123,26 @@ SELECT is(
   'A caller who already has a company does not get a second one'
 );
 
+INSERT INTO public.companies (id, name, email, phone)
+VALUES ('ffffffff-0000-0000-0000-000000000001', 'Frank older company', 'frank-older@example.com', 'frank-older-phone');
+INSERT INTO public.company_users (user_id, company_id, role_id, date_associated)
+VALUES (
+  'eeeeeeee-0000-0000-0000-000000000002',
+  'ffffffff-0000-0000-0000-000000000001',
+  (SELECT id FROM public.roles WHERE role_name = 'Admin'),
+  now() - interval '1 day'
+);
+
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub": "dddddddd-0000-0000-0000-000000000002", "role": "authenticated"}', true);
+
+SELECT is(
+  public.ensure_my_company(),
+  'ffffffff-0000-0000-0000-000000000001'::uuid,
+  'A caller with several companies gets the one they joined first'
+);
+
+RESET ROLE;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub": "dddddddd-0000-0000-0000-000000000003", "role": "authenticated"}', true);
 
@@ -123,15 +158,36 @@ SELECT is(
 );
 
 SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims', '{"sub": "dddddddd-0000-0000-0000-000000000004", "role": "authenticated"}', true);
+
+SELECT isnt(public.ensure_my_company(), NULL::uuid, 'Hal, who has no company, gets one');
+
+RESET ROLE;
+
+SELECT is(
+  (SELECT count(*) FROM public.company_users WHERE user_id = 'eeeeeeee-0000-0000-0000-000000000005'),
+  0::bigint,
+  'Hal calling it does not give Ida, who also has no company, one'
+);
+
+CREATE TEMP TABLE company_count_before AS SELECT count(*) AS total FROM public.companies;
+
+SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub": "dddddddd-0000-0000-0000-0000000000ff", "role": "authenticated"}', true);
 
 SELECT is(
   public.ensure_my_company(),
   NULL::uuid,
-  'A caller with no users row gets NULL and no company is created'
+  'A caller with no users row gets NULL'
 );
 
 RESET ROLE;
+
+SELECT is(
+  (SELECT count(*) FROM public.companies),
+  (SELECT total FROM company_count_before),
+  'A caller with no users row creates no company'
+);
 SET LOCAL ROLE anon;
 SELECT set_config('request.jwt.claims', '{"role": "anon"}', true);
 

@@ -361,6 +361,5 @@ See test files:
 - `country_code` added in migration `20251127064917_add_country_code_to_users.sql`
 - RLS policies added in migration `20251218175536_RLS_07_users_table_rules.sql`
 - Personal company trigger, `get_my_company_id()`, `ON DELETE CASCADE` on `company_users.user_id` and the empty company trigger added in migration `20261004120000_48_personal_company_trigger.sql`
-- `ensure_my_company()` and `create_personal_company()` added in migration `20261006120000_49_ensure_my_company.sql`, which also moves the company creation out of the trigger function
-- This migration has a later timestamp than the migrations in backend PRs #57 and #58. If it is pushed to a remote database first, those two need `supabase db push --include-all`
+- `ensure_my_company()` and `create_personal_company()` added in migration `20261014120000_54_ensure_my_company.sql`, which also moves the company creation out of the trigger function
 - View created in migration `20251218175411_create_user_profile_view.sql`
