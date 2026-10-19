@@ -1,5 +1,5 @@
 begin;
-select plan(63);
+select plan(66);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -282,6 +282,42 @@ SELECT throws_ok(
   '42501',
   NULL,
   'An editor of project 1 cannot move an item to an estimate of project 2'
+);
+
+-- An editor of project 1 who may only look into project 2. The select policy
+-- lets this user see the project 2 item, so the update WITH CHECK and the delete
+-- rule are the parts that refuse here. The user above has no key on project 2,
+-- and the select policy alone stops that user.
+SELECT set_config('request.jwt.claims', '{
+  "sub": "22222222-2222-2222-2222-222222222222",
+  "app_metadata": {
+    "internal_user_id": "11111111-1111-1111-1111-111111111111",
+    "projects": {
+      "33333333-3333-3333-3333-333333333333": ["get_cost_estimations", "edit_cost_estimation"],
+      "33333333-3333-3333-3333-333333333344": ["get_cost_estimations"]
+    }
+  }
+}', true);
+
+SELECT throws_ok(
+  $$ UPDATE cost_items SET estimate_id = 'a50e8400-e29b-41d4-a716-446655440099'
+     WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  '42501',
+  NULL,
+  'An editor of project 1 who can only read project 2 cannot move an item there'
+);
+
+-- A delete the policy hides raises no error, it touches 0 rows. A delete that
+-- worked would soft-delete the item, and the restrictive policy would then hide
+-- it, so the item still being readable proves the delete touched nothing.
+SELECT lives_ok(
+  $$ DELETE FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440020' $$,
+  'An editor of project 1 who can only read project 2 gets no error from a delete there'
+);
+
+SELECT isnt_empty(
+  $$ SELECT 1 FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440020' $$,
+  'The project 2 item is still there and readable, so the delete touched 0 rows'
 );
 
 -- A viewer holds get_cost_estimations only.
