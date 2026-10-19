@@ -32,7 +32,9 @@ but that grouping can now hold several entries, disambiguated by
   `item_name_key` (lower case, runs of whitespace collapsed to one space,
   trimmed), and `NULL` when nothing is left, so a label of only spaces counts as
   no label. The collision constraint compares this column. Never written by a
-  client, and not in the `user_rates` stream: the phone builds its own key
+  client, and not in the `user_rates` stream: the phone builds its own key.
+  Added by migration 57 (`20261019120000_57_your_rates_label_key.sql`), so it is
+  the last column, after `last_used_at`
 
 ### Rate Fields
 - `rate_amount` - `numeric(18,4)`, mirrors `cost_items.unit_price`
