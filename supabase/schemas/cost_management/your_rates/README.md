@@ -48,6 +48,13 @@ but that grouping can now hold several entries, disambiguated by
 - `saved_at` - Client-supplied, `timestamptz`, NOT NULL, no default. Domain
   time (when the contractor saved the rate), not row-modification time —
   same precedent as `user_consents.recorded_at`
+- `last_used_at` - Client-supplied, `timestamptz`, nullable, no default. The
+  last time a cost line was added with this rate, stamped by the phone that
+  added the line (storyboard CUJ 6, "Used label"). NULL until the first use,
+  so the app can say "Saved 3 days ago" for a rate that was never added and
+  "Used 3 days ago" for one that was. Saving a new price moves `saved_at` and
+  leaves this column alone. No CHECK against `saved_at`, because a save after
+  the last use is a valid state (CA-1265)
 - `created_at` / `updated_at` - Standard row-modification timestamps,
   present on every table in this repo regardless of whether the Dart entity
   exposes them; `updated_at` is kept current by the shared
