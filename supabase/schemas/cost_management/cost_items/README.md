@@ -108,6 +108,8 @@ Row-level security does not follow the foreign key to `cost_estimates`, so `cost
 | Update items | `edit_cost_estimation` |
 | Delete items | `edit_cost_estimation` |
 
+Every write also needs `get_cost_estimations`, because the lookup of the parent estimate runs under its select policy.
+
 ## Functions
 
 ### `handle_soft_delete_cost_items()`

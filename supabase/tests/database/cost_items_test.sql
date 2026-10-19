@@ -1,5 +1,5 @@
 begin;
-select plan(60);
+select plan(63);
 
 SELECT has_column('public', 'cost_items', 'id', 'cost_items.id column exists');
 SELECT col_type_is('public', 'cost_items', 'id', 'uuid', 'cost_items.id is uuid');
@@ -215,6 +215,16 @@ SELECT throws_like(
   'waste_percent rejects -5'
 );
 
+-- CA-1182: a second project with its own estimate and item, so the policies
+-- are tested against the wrong project as well as the right one.
+INSERT INTO projects (id, project_name, creator_user_id, created_at, updated_at, project_status)
+  VALUES ('33333333-3333-3333-3333-333333333344', 'Other Project', '11111111-1111-1111-1111-111111111111', now(), now(), 'active');
+INSERT INTO cost_estimates (id, project_id, estimate_name, creator_user_id, markup_type, total_cost, is_locked)
+  VALUES ('a50e8400-e29b-41d4-a716-446655440099', '33333333-3333-3333-3333-333333333344', 'Other Estimate',
+          '11111111-1111-1111-1111-111111111111', 'overall', 1000.00, false);
+INSERT INTO cost_items (id, estimate_id, item_type, item_name, calculation, item_total_cost, currency)
+  VALUES ('c50e8400-e29b-41d4-a716-446655440020', 'a50e8400-e29b-41d4-a716-446655440099', 'material', 'Other project item', '{}', 10.00, 'USD');
+
 -- CA-1182: a signed-in user reads and writes cost items through RLS. The
 -- checks above run as the table owner, which skips RLS.
 SET LOCAL ROLE authenticated;
@@ -250,6 +260,28 @@ SELECT is(
   (SELECT waste_percent FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440010'),
   7.00::numeric(5,2),
   'The editor update is stored'
+);
+
+-- The editor holds permissions on project 1 only. Project 2 stays out of reach.
+SELECT is_empty(
+  $$ SELECT 1 FROM cost_items WHERE id = 'c50e8400-e29b-41d4-a716-446655440020' $$,
+  'An editor of project 1 cannot read an item of project 2'
+);
+
+SELECT throws_ok(
+  $$ INSERT INTO cost_items (estimate_id, item_type, item_name, calculation, item_total_cost, currency)
+     VALUES ('a50e8400-e29b-41d4-a716-446655440099', 'material', 'Wrong project item', '{}', 10.00, 'USD') $$,
+  '42501',
+  NULL,
+  'An editor of project 1 cannot insert into an estimate of project 2'
+);
+
+SELECT throws_ok(
+  $$ UPDATE cost_items SET estimate_id = 'a50e8400-e29b-41d4-a716-446655440099'
+     WHERE id = 'c50e8400-e29b-41d4-a716-446655440010' $$,
+  '42501',
+  NULL,
+  'An editor of project 1 cannot move an item to an estimate of project 2'
 );
 
 -- A viewer holds get_cost_estimations only.

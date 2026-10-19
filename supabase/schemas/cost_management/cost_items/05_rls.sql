@@ -8,6 +8,8 @@ ALTER TABLE "public"."cost_items" ENABLE ROW LEVEL SECURITY;
 -- parent estimate, read from the JWT. No cost-item permission key exists, so the
 -- estimate keys are reused: get_cost_estimations to read, edit_cost_estimation to
 -- insert, update and delete. The subquery runs under the cost_estimates policies.
+-- Every write also needs get_cost_estimations, because the lookup of the parent
+-- estimate runs under its select policy.
 
 CREATE POLICY "cost_items_select_policy" ON "public"."cost_items"
   FOR SELECT

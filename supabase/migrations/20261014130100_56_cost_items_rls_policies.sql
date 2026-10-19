@@ -11,6 +11,9 @@
 -- estimate keys are reused: get_cost_estimations to read, edit_cost_estimation
 -- to insert, update and delete.
 --
+-- Every write also needs get_cost_estimations, because the lookup of the parent
+-- estimate runs under its select policy.
+--
 -- The EXISTS subquery runs under the cost_estimates policies, so an item of a
 -- soft-deleted estimate or of a project the caller cannot read stays hidden.
 --
