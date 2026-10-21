@@ -39,7 +39,14 @@ The `cost_items` table stores individual line items within cost estimates. Each 
 - `daily_rate` - Rate per day for day-priced equipment (decimal 18,4)
 - `job_amount` - Flat amount for job-priced equipment (decimal 18,4)
 - `delivery_fee` - Delivery fee; NULL means unquoted (decimal 18,4)
-- `rate_status` - Enum: 'sample_rate_unverified', 'own_rate_unconfirmed', 'own_rate_confirmed', or 'missing'
+
+### Shared Fields
+- `rate_status` - Enum: 'sample_rate_unverified', 'own_rate_unconfirmed', 'own_rate_confirmed', or 'missing'. Shared by every item type. It has no equipment prefix and no check constraint ties it to `item_type`, so Material and Labor rows use it too. CA-1182 confirmed this, so Material has no column of its own for it. CA-1156 added the column.
+
+### Material v2 Fields
+- `waste_percent` - Waste allowance in percent (decimal 5,2), limited to 0 to 100 by `cost_items_waste_percent_range_check`. NULL means unset, which is different from an explicit 0
+- `quantity_provenance` - Enum: 'manual' or 'from_calculator'. Says where the quantity came from
+- `calculator_formula` - Text. The formula the calculator produced, shown as "From calculator - [formula]". The app clears it when the quantity is edited by hand
 
 ### Metadata
 - `created_at` - Creation timestamp
@@ -55,6 +62,7 @@ Three types of cost items are supported:
 - Physical products/supplies
 - Uses: `unit_price`, `quantity`, `unit_measurement`
 - Optional: `brand`, `product_link`
+- v2: `waste_percent`, `quantity_provenance`, `calculator_formula`, `rate_status`
 
 **Labor**:
 - Worker costs
@@ -91,13 +99,16 @@ Format is flexible and can be extended as needed.
 
 ## Permissions
 
-Cost items inherit permissions from their parent estimate. Access control is enforced at the **cost_estimates level**, not at the item level.
+Row-level security does not follow the foreign key to `cost_estimates`, so `cost_items` has its own policies. Each one allows an item when the caller holds the permission on the project of the item's parent estimate, read from the JWT with `jwt_has_project_permission()`. No cost-item permission key exists, so the estimate keys are reused.
 
-Users with access to a cost estimate can:
-- View all items in that estimate
-- Create new items in that estimate
-- Update items in that estimate
-- Delete items from that estimate
+| Operation | Permission on the estimate's project |
+|---|---|
+| View items | `get_cost_estimations` |
+| Create items | `edit_cost_estimation` |
+| Update items | `edit_cost_estimation` |
+| Delete items | `edit_cost_estimation` |
+
+Every write also needs `get_cost_estimations`, because the lookup of the parent estimate runs under its select policy.
 
 ## Functions
 
@@ -147,7 +158,7 @@ Users with access to a cost estimate can:
 
 3. `trigger_log_cost_item_edited` - AFTER UPDATE
    - Logs field changes when any tracked field is modified
-   - Tracks 23 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, all labor fields, and all equipment fields
+   - Tracks 26 fields: item_type, item_name, unit_price, quantity, unit_measurement, calculation, item_total_cost, currency, brand, product_link, description, all labor fields, all equipment fields, and all Material v2 fields
 
 4. `trigger_log_cost_item_removed` - AFTER UPDATE
    - Logs removal activity when item is soft deleted
@@ -164,10 +175,16 @@ Performance indexes for common queries:
 
 ## RLS Policies
 
+### Permissive Policies (target `authenticated`)
+1. **cost_items_select_policy** - `get_cost_estimations` on the parent estimate's project
+2. **cost_items_insert_policy** - `edit_cost_estimation` on the parent estimate's project
+3. **cost_items_update_policy** - `edit_cost_estimation` on the parent estimate's project, before and after the update
+4. **cost_items_delete_policy** - `edit_cost_estimation` on the parent estimate's project
+
 ### Restrictive Policy (must pass for all operations)
 1. **exclude_soft_deleted_items** - Hides rows where `deleted_at IS NOT NULL`
 
-**Note**: There are no permissive policies at the item level. Access control happens at the parent `cost_estimates` table level through RLS policies there.
+**Note**: Each permissive policy checks the parent estimate through an `EXISTS` subquery, which runs under the `cost_estimates` policies. When cost items join a PowerSync stream, the stream filter must carry the same rule, because PowerSync does not apply RLS.
 
 ## Usage Examples
 

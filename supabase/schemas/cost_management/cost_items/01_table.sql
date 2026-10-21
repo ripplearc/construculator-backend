@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS "public"."cost_items" (
     "job_amount" numeric(18,4),
     "delivery_fee" numeric(18,4),
     "rate_status" "public"."rate_status_enum",
+    "waste_percent" numeric(5,2),
+    "quantity_provenance" "public"."quantity_provenance_enum",
+    "calculator_formula" text,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "deleted_at" timestamp with time zone
@@ -53,3 +56,7 @@ ALTER TABLE ONLY "public"."cost_items"
 ALTER TABLE ONLY "public"."cost_items"
     ADD CONSTRAINT "cost_items_duration_half_day_check"
       CHECK ("duration" IS NULL OR ("duration" > 0 AND "duration" * 2 = trunc("duration" * 2)));
+
+ALTER TABLE ONLY "public"."cost_items"
+    ADD CONSTRAINT "cost_items_waste_percent_range_check"
+      CHECK ("waste_percent" IS NULL OR "waste_percent" BETWEEN 0 AND 100);

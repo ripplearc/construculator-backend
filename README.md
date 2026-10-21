@@ -287,7 +287,7 @@ npx supabase test db
 | `critical_tables_insert_and_columns_test` | Column definitions on critical tables |
 | `cost_estimates_test` | CRUD operations on cost estimates |
 | `cost_estimates_update_guard_test` | Immutable field enforcement, lock permissions |
-| `cost_items_test` | Cost item operations and triggers |
+| `cost_items_test` | Cost item operations and triggers, Equipment v2 and Material v2 columns |
 | `cost_estimate_logs_test` | Audit log entries |
 | `cost_estimate_activity_logging_test` | End-to-end activity logging via triggers |
 | `cascade_delete_test` | Soft-delete cascade behavior |
