@@ -8,10 +8,16 @@
 -- the phone.
 --
 -- entry_label_key is the label the way the other saves are matched against it:
--- lower case, every run of whitespace (spaces, tabs, new lines, non-breaking
--- spaces) collapsed to one space, outer spaces trimmed, and NULL when nothing
--- is left. It is built like item_name_key. entry_label keeps the user's own
+-- lower case, every run of whitespace collapsed to one space, outer spaces
+-- trimmed, and NULL when nothing is left. entry_label keeps the user's own
 -- spelling for display. The key is never written by a client.
+--
+-- The phone builds the same key with Dart's \s, which also counts U+00A0, U+2007
+-- (figure space), U+202F (narrow no-break space) and U+FEFF as space and trims
+-- U+0085 at the ends. Postgres \s does not, so those are listed here. Apple
+-- phones put U+202F in times such as "5 PM". Rare capital letters (Cherokee,
+-- Osage, Adlam) are lower-cased differently by Postgres and Dart and are not
+-- covered here.
 --
 -- The unique constraint keeps its name and its NULLS NOT DISTINCT rule, and
 -- compares entry_label_key in place of entry_label. A label of only spaces now
@@ -24,8 +30,18 @@
 -- ADD COLUMN puts the column last. The schema mirror lists it last too.
 --
 -- If two rows of one company already differ only by the case or spacing of
--- their label, adding the constraint fails with a unique violation naming the
--- constraint. Merge or relabel those rows, then run this migration again.
+-- their label, adding the constraint fails with a unique violation naming only
+-- the first clashing group. A label of only spaces clashes with a row that has
+-- no label. To list every clashing group at once, run this before the deploy,
+-- then merge or relabel those rows:
+--   SELECT company_id, category, item_name_key, equipment_method,
+--          NULLIF(lower(btrim(regexp_replace(entry_label,
+--            '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')
+--            AS label_key,
+--          count(*), array_agg(entry_label)
+--   FROM public.your_rates
+--   GROUP BY 1, 2, 3, 4, 5
+--   HAVING count(*) > 1;
 --
 -- Written by hand like migration 45. Mirrors
 -- supabase/schemas/cost_management/your_rates/01_table.sql, keep them in step.
@@ -41,7 +57,7 @@
 -- https://ripplearc.youtrack.cloud/issue/CA-1261
 
 ALTER TABLE "public"."your_rates"
-    ADD COLUMN IF NOT EXISTS "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0]+', ' ', 'g'))), '')) STORED;
+    ADD COLUMN IF NOT EXISTS "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')) STORED;
 
 ALTER TABLE ONLY "public"."your_rates"
     DROP CONSTRAINT IF EXISTS "your_rates_company_category_name_method_label_key";

@@ -37,11 +37,12 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     -- migration 49.
     "last_used_at" timestamp with time zone,
     -- The label the way other saves are matched against it, built like
-    -- item_name_key: lower case, runs of whitespace collapsed to one space,
-    -- outer spaces trimmed, NULL when nothing is left. entry_label keeps the
+    -- item_name_key: lower case, runs of whitespace (including U+00A0, U+2007,
+    -- U+202F and U+FEFF, which Postgres \s does not match) collapsed to one
+    -- space, outer spaces and U+0085 trimmed, NULL when nothing is left. entry_label keeps the
     -- user's own spelling for display. Never written by a client. Added by
     -- migration 57, so it is the last column.
-    "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0]+', ' ', 'g'))), '')) STORED
+    "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')) STORED
 );
 
 
