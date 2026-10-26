@@ -153,7 +153,7 @@ SELECT set_config('request.jwt.claims', '{
 -- The app saves with an upsert that leaves last_used_at out.
 INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
 VALUES ('77777777-7777-7777-7777-777777777777', 'equipment', 'Added once', 125.0000, 'USD', '2026-04-01T00:00:00Z')
-ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label)
+ON CONFLICT (company_id, category, item_name_key, equipment_method, entry_label_key)
 DO UPDATE SET rate_amount = EXCLUDED.rate_amount, saved_at = EXCLUDED.saved_at;
 
 SELECT is(

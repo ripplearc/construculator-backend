@@ -20,9 +20,10 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     "unit" character varying(50),
     "equipment_method" "public"."equipment_pricing_method_enum",
     -- Distinguishes multiple entries in the same (company_id, category,
-    -- item_name_key, equipment_method) grouping (Decision 55). NULL is a valid, comparable label
-    -- for collision purposes -- see the UNIQUE NULLS NOT DISTINCT constraint
-    -- below.
+    -- item_name_key, equipment_method) grouping (Decision 55). Labels are
+    -- compared through entry_label_key, below the table. NULL is a valid,
+    -- comparable label for collision purposes -- see the UNIQUE NULLS NOT
+    -- DISTINCT constraint below.
     "entry_label" character varying(100),
     -- Client-supplied, like user_consents.recorded_at: this is domain time
     -- (when the contractor saved the rate), not row-modification time, so it
@@ -33,8 +34,15 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     -- Client-supplied, like saved_at. The last time a cost line was added with
     -- this rate (storyboard CUJ 6, "Used label"). NULL until the first use, so
     -- the app can say "Saved ..." for a rate that was never added. Added by
-    -- migration 49, so it is the last column.
-    "last_used_at" timestamp with time zone
+    -- migration 49.
+    "last_used_at" timestamp with time zone,
+    -- The label the way other saves are matched against it, built like
+    -- item_name_key: lower case, runs of whitespace (including U+00A0, U+2007,
+    -- U+202F and U+FEFF, which Postgres \s does not match) collapsed to one
+    -- space, outer spaces and U+0085 trimmed, NULL when nothing is left. entry_label keeps the
+    -- user's own spelling for display. Never written by a client. Added by
+    -- migration 57, so it is the last column.
+    "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')) STORED
 );
 
 
@@ -57,8 +65,9 @@ ALTER TABLE ONLY "public"."your_rates"
 
 
 -- Collision constraint (Decision 55): two rows can never share the same
--- (company_id, category, item_name_key, equipment_method, entry_label), including
--- when equipment_method or entry_label is NULL on both. equipment_method is part
+-- (company_id, category, item_name_key, equipment_method, entry_label_key),
+-- including when equipment_method or the label is NULL on both. Labels that differ
+-- only by capital letters or extra spaces have the same entry_label_key. equipment_method is part
 -- of the key because one name can be saved with a day rate and with a job price
 -- ("Saved with both", storyboard CUJ 6): those are two rows. NULLS NOT DISTINCT
 -- (Postgres 15+) makes two NULLs count as equal for this constraint, unlike a
@@ -68,7 +77,7 @@ ALTER TABLE ONLY "public"."your_rates"
 -- leading columns still serve the group lookup.
 ALTER TABLE ONLY "public"."your_rates"
     ADD CONSTRAINT "your_rates_company_category_name_method_label_key"
-    UNIQUE NULLS NOT DISTINCT ("company_id", "category", "item_name_key", "equipment_method", "entry_label");
+    UNIQUE NULLS NOT DISTINCT ("company_id", "category", "item_name_key", "equipment_method", "entry_label_key");
 
 -- Row rules, so another client cannot save rows the app never would.
 ALTER TABLE ONLY "public"."your_rates"
