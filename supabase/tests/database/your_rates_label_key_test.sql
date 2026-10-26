@@ -6,7 +6,7 @@ BEGIN;
 -- label, the same as the phone does. Run as postgres, which bypasses RLS and
 -- isolates the constraint layer.
 
-SELECT plan(18);
+SELECT plan(24);
 
 INSERT INTO companies (id, email, phone, name)
 VALUES ('99999999-9999-9999-9999-999999999999', 'label-key-company@example.com', '+1-555-0009', 'Label Key Test Company');
@@ -50,7 +50,12 @@ VALUES
   ('a0000000-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 3', 1.0000, 'USD', now(), '   '),
   ('a0000000-0000-0000-0000-000000000004', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 4', 1.0000, 'USD', now(), ''),
   ('a0000000-0000-0000-0000-000000000005', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 5', 1.0000, 'USD', now(), NULL),
-  ('a0000000-0000-0000-0000-000000000006', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 6', 1.0000, 'USD', now(), 'Élévateur');
+  ('a0000000-0000-0000-0000-000000000006', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 6', 1.0000, 'USD', now(), 'Élévateur'),
+  ('a0000000-0000-0000-0000-000000000007', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 7', 1.0000, 'USD', now(), E'After 5\u202fPM'),
+  ('a0000000-0000-0000-0000-000000000008', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 8', 1.0000, 'USD', now(), E'After 5\u2007PM'),
+  ('a0000000-0000-0000-0000-000000000009', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 9', 1.0000, 'USD', now(), E'\ufeffAfter 5 PM'),
+  ('a0000000-0000-0000-0000-00000000000a', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 10', 1.0000, 'USD', now(), E'\u0085After 5 PM\u0085'),
+  ('a0000000-0000-0000-0000-00000000000b', '99999999-9999-9999-9999-999999999999', 'material', 'Key probe 11', 1.0000, 'USD', now(), E'\u0085');
 
 SELECT is(
   (SELECT entry_label_key FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-000000000001'),
@@ -89,6 +94,36 @@ SELECT is(
 );
 
 SELECT is(
+  (SELECT entry_label_key FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-000000000007'),
+  'after 5 pm',
+  'A narrow no-break space (U+202F) counts as a space'
+);
+
+SELECT is(
+  (SELECT entry_label_key FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-000000000008'),
+  'after 5 pm',
+  'A figure space (U+2007) counts as a space'
+);
+
+SELECT is(
+  (SELECT entry_label_key FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-000000000009'),
+  'after 5 pm',
+  'A byte-order mark (U+FEFF) at the start is trimmed'
+);
+
+SELECT is(
+  (SELECT entry_label_key FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-00000000000a'),
+  'after 5 pm',
+  'A next-line character (U+0085) at both ends is trimmed'
+);
+
+SELECT is(
+  (SELECT entry_label_key FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-00000000000b'),
+  NULL,
+  'A label of only U+0085 has no key'
+);
+
+SELECT is(
   (SELECT entry_label FROM public.your_rates WHERE id = 'a0000000-0000-0000-0000-000000000001'),
   E'  With \t Operator  ',
   'entry_label keeps the text as it was written'
@@ -115,6 +150,14 @@ SELECT throws_ok(
   '23505',
   NULL,
   'A label that differs only by extra spaces is the same label'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at, entry_label)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now(), E'With\u202foperator')$$,
+  '23505',
+  NULL,
+  'A label with a narrow no-break space is the same label as one with a normal space'
 );
 
 SELECT lives_ok(

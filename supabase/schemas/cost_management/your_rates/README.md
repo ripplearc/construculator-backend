@@ -30,7 +30,9 @@ but that grouping can now hold several entries, disambiguated by
 
 - `entry_label_key` - Generated and stored: `entry_label` built like
   `item_name_key` (lower case, runs of whitespace collapsed to one space,
-  trimmed), and `NULL` when nothing is left, so a label of only spaces counts as
+  trimmed), and `NULL` when nothing is left. The whitespace set is `\s` plus
+  U+00A0, U+2007, U+202F and U+FEFF, and U+0085 is trimmed at the ends, the same
+  characters the phone treats as space. So a label of only spaces counts as
   no label. The collision constraint compares this column. Never written by a
   client, and not in the `user_rates` stream: the phone builds its own key.
   Added by migration 57 (`20261019120000_57_your_rates_label_key.sql`), so it is
