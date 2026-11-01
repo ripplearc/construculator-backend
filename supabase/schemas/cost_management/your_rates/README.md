@@ -22,11 +22,13 @@ but that grouping can now hold several entries, disambiguated by
   `'equipment'` (reused directly, not a new enum)
 - `item_name` - Display name for the item, kept in the contractor's own spelling
 - `item_name_key` - Generated and stored: `item_name` in lower case, every run of
-  whitespace (spaces, tabs, new lines, non-breaking spaces) collapsed to one
-  space, then trimmed. The collision
+  whitespace collapsed to one space, then trimmed. The whitespace set is `\s`
+  plus U+00A0, U+2007, U+202F and U+FEFF, and U+0085 is trimmed at the ends, the
+  same characters as `entry_label_key` and the phone. The collision
   constraint compares this column, so `Mini excavator`, `MINI  EXCAVATOR` and
   ` mini excavator ` are one name ("Names match without regard to capital
-  letters or extra spaces", storyboard CUJ 6). Never written by a client
+  letters or extra spaces", storyboard CUJ 6). Never written by a client.
+  Rebuilt by migration 57, so it is the last column, after `entry_label_key`
 
 - `entry_label_key` - Generated and stored: `entry_label` built like
   `item_name_key` (lower case, runs of whitespace collapsed to one space,
@@ -36,7 +38,7 @@ but that grouping can now hold several entries, disambiguated by
   no label. The collision constraint compares this column. Never written by a
   client, and not in the `user_rates` stream: the phone builds its own key.
   Added by migration 57 (`20261019120000_57_your_rates_label_key.sql`), so it is
-  the last column, after `last_used_at`
+  after `last_used_at`
 
 ### Rate Fields
 - `rate_amount` - `numeric(18,4)`, mirrors `cost_items.unit_price`

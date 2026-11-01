@@ -6,13 +6,6 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     "company_id" "uuid" NOT NULL,
     "category" "public"."cost_item_type_enum" NOT NULL,
     "item_name" character varying(255) NOT NULL,
-    -- The name as the contractor's other saves are matched against it: lower
-    -- case, runs of whitespace (tabs, new lines, non-breaking spaces) collapsed to
-    -- one space, then outer spaces trimmed ("Names match without regard to capital letters or extra
-    -- spaces", storyboard CUJ 6). item_name keeps the user's own spelling for
-    -- display. A stored generated column, not an expression index, so the
-    -- unique constraint below can still be an upsert target.
-    "item_name_key" "text" GENERATED ALWAYS AS (lower(btrim(regexp_replace("item_name", '[\s\u00a0]+', ' ', 'g')))) STORED NOT NULL,
     "rate_amount" numeric(18,4) NOT NULL,
     "rate_currency" character varying(20) NOT NULL,
     -- Free text, not a Postgres enum: matches cost_items.unit_measurement,
@@ -41,8 +34,17 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     -- U+202F and U+FEFF, which Postgres \s does not match) collapsed to one
     -- space, outer spaces and U+0085 trimmed, NULL when nothing is left. entry_label keeps the
     -- user's own spelling for display. Never written by a client. Added by
-    -- migration 57, so it is the last column.
-    "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')) STORED
+    -- migration 57.
+    "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(lower(btrim(regexp_replace("entry_label", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')) STORED,
+    -- The name as the contractor's other saves are matched against it, with the
+    -- same characters as entry_label_key: lower case, runs of whitespace
+    -- collapsed to one space, outer spaces and U+0085 trimmed ("Names match
+    -- without regard to capital letters or extra spaces", storyboard CUJ 6).
+    -- item_name keeps the user's own spelling for display. A stored generated
+    -- column, not an expression index, so the unique constraint below can still
+    -- be an upsert target. Rebuilt by migration 57 with the same characters as
+    -- the phone, so it is the last column.
+    "item_name_key" "text" GENERATED ALWAYS AS (lower(btrim(regexp_replace("item_name", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085'))) STORED NOT NULL
 );
 
 

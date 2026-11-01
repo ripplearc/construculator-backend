@@ -6,7 +6,7 @@ BEGIN;
 -- label, the same as the phone does. Run as postgres, which bypasses RLS and
 -- isolates the constraint layer.
 
-SELECT plan(24);
+SELECT plan(32);
 
 INSERT INTO companies (id, email, phone, name)
 VALUES ('99999999-9999-9999-9999-999999999999', 'label-key-company@example.com', '+1-555-0009', 'Label Key Test Company');
@@ -190,6 +190,72 @@ SELECT is(
      WHERE company_id = '99999999-9999-9999-9999-999999999999' AND item_name = 'Mini excavator'),
   2::bigint,
   'The upsert left two rows, not three'
+);
+
+-- ============================================================
+-- The item name key uses the same characters
+-- ============================================================
+
+SELECT is(
+  (SELECT attgenerated::text FROM pg_attribute
+     WHERE attrelid = 'public.your_rates'::regclass AND attname = 'item_name_key'),
+  's',
+  'item_name_key is still a stored generated column'
+);
+
+SELECT is(
+  (SELECT attnum FROM pg_attribute
+     WHERE attrelid = 'public.your_rates'::regclass AND attname = 'item_name_key'),
+  (SELECT max(attnum) FROM pg_attribute
+     WHERE attrelid = 'public.your_rates'::regclass AND attnum > 0 AND NOT attisdropped),
+  'item_name_key is the last column, as the schema file lists it'
+);
+
+INSERT INTO public.your_rates (id, company_id, category, item_name, rate_amount, rate_currency, saved_at)
+VALUES
+  ('b0000000-0000-0000-0000-000000000001', '99999999-9999-9999-9999-999999999999', 'material', E'Scissor\u202flift', 1.0000, 'USD', now()),
+  ('b0000000-0000-0000-0000-000000000002', '99999999-9999-9999-9999-999999999999', 'material', E'Scissor\u2007Jack', 1.0000, 'USD', now()),
+  ('b0000000-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999', 'material', E'\ufeffScissor Pole', 1.0000, 'USD', now()),
+  ('b0000000-0000-0000-0000-000000000004', '99999999-9999-9999-9999-999999999999', 'material', E'\u0085Scissor Rail\u0085', 1.0000, 'USD', now());
+
+SELECT is(
+  (SELECT item_name_key FROM public.your_rates WHERE id = 'b0000000-0000-0000-0000-000000000001'),
+  'scissor lift',
+  'A narrow no-break space (U+202F) in a name counts as a space'
+);
+
+SELECT is(
+  (SELECT item_name_key FROM public.your_rates WHERE id = 'b0000000-0000-0000-0000-000000000002'),
+  'scissor jack',
+  'A figure space (U+2007) in a name counts as a space'
+);
+
+SELECT is(
+  (SELECT item_name_key FROM public.your_rates WHERE id = 'b0000000-0000-0000-0000-000000000003'),
+  'scissor pole',
+  'A byte-order mark (U+FEFF) at the start of a name is trimmed'
+);
+
+SELECT is(
+  (SELECT item_name_key FROM public.your_rates WHERE id = 'b0000000-0000-0000-0000-000000000004'),
+  'scissor rail',
+  'U+0085 at both ends of a name is trimmed'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'material', 'Scissor lift', 1.0000, 'USD', now())$$,
+  '23505',
+  NULL,
+  'A name with a normal space clashes with the same name saved with U+202F'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'material', E'\u202f\u2007', 1.0000, 'USD', now())$$,
+  '23514',
+  NULL,
+  'A name of only U+202F and U+2007 counts as blank'
 );
 
 -- ============================================================
