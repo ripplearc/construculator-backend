@@ -1,6 +1,6 @@
 -- RLS policies for user_calculator_stores
 -- Owner only, on every verb. A trade store is personal: no teammate, no
--- project and no company ever reads another user's rates or sheet sizes.
+-- project and no company ever reads another user's sheet sizes or densities.
 --
 -- Keyed on jwt_internal_user_id(), NOT auth.uid(), as user_consents is:
 -- auth.uid() returns users.credential_id while user_id here references

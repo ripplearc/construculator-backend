@@ -2,15 +2,16 @@ BEGIN;
 
 -- Tests for CA-1076: user_calculator_stores, the calculator's trade stores
 -- that follow the user's account. Covers the shape (columns, the store-kind
--- enum's wire values, the two CHECKs, the partial index, the one-live-row-
--- per-seed unique index), the updated_at trigger the conflict rule rests on,
--- the users FK cascading on account deletion, the publication membership the
+-- enum's wire values and the 'rate' kind CA-1398 dropped, the two CHECKs, the
+-- partial index, the one-live-row-per-seed unique index), the updated_at
+-- trigger the conflict rule rests on, the users FK cascading on account
+-- deletion, the publication membership the
 -- sync stream depends on, and the RLS posture: own rows only on every verb,
 -- keyed on the internal_user_id JWT claim rather than auth.uid(), nothing at
 -- all without the claim, and nothing for anon. The updated_at stamp and the
 -- soft delete run as authenticated, the path the app takes.
 
-SELECT plan(37);
+SELECT plan(38);
 
 -- ============================================================
 -- Shape
@@ -30,8 +31,8 @@ SELECT is(
      FROM pg_enum e
      JOIN pg_type t ON t.oid = e.enumtypid
      WHERE t.typname = 'calculator_store_kind_enum'),
-  'sheet_size,masonry_piece,footing_section,on_centre_spacing,fence_config,rate,waste,density' COLLATE "C",
-  'calculator_store_kind_enum carries exactly the eight stores of term 2.16, in order'
+  'sheet_size,masonry_piece,footing_section,on_centre_spacing,fence_config,waste,density' COLLATE "C",
+  'calculator_store_kind_enum carries exactly the seven stores of term 2.16, in order, rate gone since CA-1398'
 );
 
 SELECT has_index(
@@ -96,12 +97,12 @@ BEGIN
     ('33333333-3333-3333-3333-333333333333', '44444444-4444-4444-4444-444444444444',
      'stores_other@example.com', 'Stores', 'Other', v_role_id, now(), 'active', '{}', '+1');
 
-  -- The owner's rows: a user-added sheet size and a changed seed rate.
+  -- The owner's rows: a user-added sheet size and a changed seed waste.
   INSERT INTO user_calculator_stores (id, user_id, store_kind, "values", unit_system) VALUES
     ('a0000000-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111',
      'sheet_size', '{"width_ticks": 3072, "height_ticks": 6912}', 'imperial'),
     ('a0000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
-     'rate', '{"seed": "ft2", "rate": 13.5, "waste_percent": 5}', 'imperial');
+     'waste', '{"seed": "ft2", "percent": 5}', 'imperial');
   -- The other user's row: must never be visible to the owner below.
   INSERT INTO user_calculator_stores (user_id, store_kind, "values", unit_system) VALUES
     ('33333333-3333-3333-3333-333333333333', 'density', '{"name": "gravel", "pounds_per_cubic_yard": 3100}', 'metric');
@@ -135,13 +136,23 @@ SELECT throws_ok(
   'A store kind outside the enum is rejected'
 );
 
+-- 'rate' was the sixth kind until CA-1398: the calculator's rates are
+-- your_rates rows since CA-1304, so the enum refuses it like any stranger.
+SELECT throws_ok(
+  $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
+    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 13.5}', 'imperial')$$,
+  '22P02',
+  NULL,
+  'The rate kind dropped by CA-1398 is refused'
+);
+
 -- ============================================================
 -- One live row per changed seed
 -- ============================================================
 
 SELECT throws_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
-    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 14}', 'imperial')$$,
+    VALUES ('11111111-1111-1111-1111-111111111111', 'waste', '{"seed": "ft2", "percent": 7}', 'imperial')$$,
   '23505',
   NULL,
   'A second live row for the same seed, store and unit system is refused'
@@ -149,14 +160,14 @@ SELECT throws_ok(
 
 SELECT lives_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
-    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 14}', 'metric')$$,
+    VALUES ('11111111-1111-1111-1111-111111111111', 'waste', '{"seed": "ft2", "percent": 7}', 'metric')$$,
   'The same seed under the other unit system is a different row'
 );
 
 SELECT lives_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system) VALUES
-    ('11111111-1111-1111-1111-111111111111', 'rate', '{"rate": 14}', 'imperial'),
-    ('11111111-1111-1111-1111-111111111111', 'rate', '{"rate": 15}', 'imperial')$$,
+    ('11111111-1111-1111-1111-111111111111', 'density', '{"name": "slag", "pounds_per_cubic_yard": 2900}', 'imperial'),
+    ('11111111-1111-1111-1111-111111111111', 'density', '{"name": "slag", "pounds_per_cubic_yard": 2950}', 'imperial')$$,
   'Rows without a seed key are not restricted'
 );
 
@@ -212,12 +223,12 @@ SELECT isnt_empty(
 -- A soft-deleted row frees its seed key for a new live row.
 SELECT lives_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
-    VALUES ('11111111-1111-1111-1111-111111111111', 'rate', '{"seed": "ft2", "rate": 16}', 'imperial')$$,
+    VALUES ('11111111-1111-1111-1111-111111111111', 'waste', '{"seed": "ft2", "percent": 16}', 'imperial')$$,
   'A soft-deleted seed row no longer blocks a new live row for that seed'
 );
 
 DELETE FROM public.user_calculator_stores
- WHERE "values"->>'rate' = '16';
+ WHERE "values"->>'percent' = '16';
 
 SELECT lives_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)

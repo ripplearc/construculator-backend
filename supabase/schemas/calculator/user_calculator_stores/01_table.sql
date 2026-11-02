@@ -2,8 +2,9 @@
 -- The calculator's trade stores (UX Design Doc term 2.16, Appendix B): the
 -- editable lists behind the material keys — sheet sizes, masonry piece
 -- sizes, footing cross-sections, on-centre spacings, the fence's spacing and
--- rails, rates per unit, waste per unit and named densities. They follow the
--- user's account and are the same on every phone (Appendix E).
+-- rails, waste per unit and named densities. They follow the user's account
+-- and are the same on every phone (Appendix E). Rates are not here: since
+-- CA-1304 they are the company's your_rates rows.
 --
 -- Only the rows the user added or changed live here. The seed defaults of
 -- Appendix B ship inside the app and are laid over these rows at read time,

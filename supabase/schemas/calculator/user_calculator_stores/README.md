@@ -5,9 +5,12 @@
 `user_calculator_stores` holds the calculator's **trade stores** — the
 editable lists behind the material keys (UX Design Doc term 2.16, Appendix
 B): drywall sheet sizes, masonry piece sizes, footing cross-sections,
-on-centre spacings, the fence's spacing and rails per section, rates per
-unit, waste per unit and named densities. Introduced in CA-1076 (Engine
-ticket I1; design: Calculation Module Design Doc, Appendix E).
+on-centre spacings, the fence's spacing and rails per section, waste per
+unit and named densities. Introduced in CA-1076 (Engine ticket I1; design:
+Calculation Module Design Doc, Appendix E). Rates are not a store here: since
+CA-1304 (28 Oct 2026) the calculator's rates are the company's `your_rates`
+rows, read and saved through an interface that estimation implements, and
+CA-1398 (migration 58) dropped the `rate` kind.
 
 Only the rows the user **added or changed** live here. The seed defaults of
 Appendix B ship inside the app and are laid over these rows at read time, so
@@ -26,8 +29,9 @@ in on, and a soft delete made on one phone hides the row on the others.
   `company_users.user_id` does. `user_consents` keeps `NO ACTION` because it
   is an evidence log; that reasoning does not apply here
 - `store_kind` — `calculator_store_kind_enum`: `sheet_size`, `masonry_piece`,
-  `footing_section`, `on_centre_spacing`, `fence_config`, `rate`, `waste`,
-  `density`
+  `footing_section`, `on_centre_spacing`, `fence_config`, `waste`, `density`.
+  `waste` stays although the rates left: it is a percent the calculator
+  applies to a cost, not a price, and `your_rates` has no column for it
 - `values` — `jsonb`, `CHECK (jsonb_typeof = 'object')`. The entry's fields
   in the engine's canonical units (whole ticks of 1/64 inch, hundredths of a
   pound, percent, dollars). The keys belong to the app's row mapper, not to
@@ -45,6 +49,14 @@ in on, and a soft delete made on one phone hides the row on the others.
 every identifier.
 
 ## Business Rules
+
+### Rates live in `your_rates`
+
+A rate the calculator saves ("Save $X as my default") is a `your_rates` row of
+the selected company, with the item name and type the save sheet asked for
+(CA-1304). Nothing about a rate is written here, and a `store_kind` of `rate`
+is refused by the enum (CA-1398). Waste is still a store: one percent per
+rate unit, 0% until the Waste pill is edited.
 
 ### Seeds are never stored
 

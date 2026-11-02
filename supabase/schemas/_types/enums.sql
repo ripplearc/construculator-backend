@@ -264,9 +264,12 @@ CREATE TYPE "public"."equipment_pricing_method_enum" AS ENUM (
 ALTER TYPE "public"."equipment_pricing_method_enum" OWNER TO "postgres";
 
 
--- The eight calculator trade stores (UX Design Doc term 2.16): which store a
+-- The seven calculator trade stores (UX Design Doc term 2.16): which store a
 -- user_calculator_stores row belongs to. The app's row mapper reads the
--- row's "values" object by this kind.
+-- row's "values" object by this kind. Rates are not a store here: since
+-- CA-1304 the calculator's rates are the company's your_rates rows, and
+-- CA-1398 (migration 58) dropped the 'rate' kind. waste stays, a percent the
+-- calculator applies to a cost rather than a price.
 
 CREATE TYPE "public"."calculator_store_kind_enum" AS ENUM (
     'sheet_size',
@@ -274,7 +277,6 @@ CREATE TYPE "public"."calculator_store_kind_enum" AS ENUM (
     'footing_section',
     'on_centre_spacing',
     'fence_config',
-    'rate',
     'waste',
     'density'
 );
