@@ -6,7 +6,7 @@ BEGIN;
 -- label, the same as the phone does. Run as postgres, which bypasses RLS and
 -- isolates the constraint layer.
 
-SELECT plan(32);
+SELECT plan(43);
 
 INSERT INTO companies (id, email, phone, name)
 VALUES ('99999999-9999-9999-9999-999999999999', 'label-key-company@example.com', '+1-555-0009', 'Label Key Test Company');
@@ -160,6 +160,22 @@ SELECT throws_ok(
   'A label with a narrow no-break space is the same label as one with a normal space'
 );
 
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at, entry_label)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now(), E'With\u2007operator')$$,
+  '23505',
+  NULL,
+  'A label with a figure space (U+2007) is the same label as one with a normal space'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at, entry_label)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now(), E'With\ufeffoperator')$$,
+  '23505',
+  NULL,
+  'A label with a byte-order mark (U+FEFF) in the middle is the same label as one with a normal space'
+);
+
 SELECT lives_ok(
   $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, unit, equipment_method, saved_at, entry_label)
     VALUES ('99999999-9999-9999-9999-999999999999', 'equipment', 'Mini excavator', 150.0000, 'USD', 'day', 'day', now(), 'Without operator')$$,
@@ -256,6 +272,69 @@ SELECT throws_ok(
   '23514',
   NULL,
   'A name of only U+202F and U+2007 counts as blank'
+);
+
+-- ============================================================
+-- Rare capital letters: the same rule as the phone
+-- ============================================================
+
+SELECT is(
+  public.rate_key_lower(E'Cherokee \U000013A0 Test'),
+  E'cherokee \U000013A0 test',
+  'Cherokee U+13A0 keeps its case, as Dart toLowerCase() does on the phone'
+);
+
+SELECT is(
+  public.rate_key_lower(E'\U0001E900 Adlam'),
+  E'\U0001E900 adlam',
+  'Adlam U+1E900 keeps its case'
+);
+
+SELECT is(
+  public.rate_key_lower(E'\U00000130 \U000000C9'),
+  lower(E'\U00000130 \U000000C9'),
+  'Letters that Dart and Postgres already agree on are lower-cased as before'
+);
+
+SELECT is(
+  public.rate_key_lower(E'ABC \U00010C80'),
+  E'abc \U00010C80',
+  'Old Hungarian U+10C80 keeps its case beside ordinary capitals'
+);
+
+SELECT is(
+  public.rate_key_lower(E'\U000013A0') <> public.rate_key_lower(E'\U0000AB70'),
+  true,
+  'A rare capital and its small letter are two different keys, as on the phone'
+);
+
+INSERT INTO public.your_rates (id, company_id, category, item_name, rate_amount, rate_currency, saved_at, entry_label)
+VALUES ('c0000000-0000-0000-0000-000000000001', '99999999-9999-9999-9999-999999999999', 'material', E'Rare \U000013A0', 1.0000, 'USD', now(), E'Label \U000013A0');
+
+SELECT is(
+  (SELECT item_name_key FROM public.your_rates WHERE id = 'c0000000-0000-0000-0000-000000000001'),
+  E'rare \U000013A0',
+  'A name with a rare capital keeps that capital in its key'
+);
+
+SELECT is(
+  (SELECT entry_label_key FROM public.your_rates WHERE id = 'c0000000-0000-0000-0000-000000000001'),
+  E'label \U000013A0',
+  'A label with a rare capital keeps that capital in its key'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at, entry_label)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'material', E'RARE \U000013A0', 1.0000, 'USD', now(), E'LABEL \U000013A0')$$,
+  '23505',
+  NULL,
+  'The same name and label with ordinary capitals and the same rare capital still clash'
+);
+
+SELECT lives_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at, entry_label)
+    VALUES ('99999999-9999-9999-9999-999999999999', 'material', E'Rare \U0000AB70', 1.0000, 'USD', now(), E'Label \U000013A0')$$,
+  'A name with the small letter is a different name from one with the rare capital'
 );
 
 -- ============================================================

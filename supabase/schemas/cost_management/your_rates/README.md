@@ -21,7 +21,8 @@ but that grouping can now hold several entries, disambiguated by
 - `category` - `cost_item_type_enum`: `'material'`, `'labor'`, or
   `'equipment'` (reused directly, not a new enum)
 - `item_name` - Display name for the item, kept in the contractor's own spelling
-- `item_name_key` - Generated and stored: `item_name` in lower case, every run of
+- `item_name_key` - Generated and stored: `item_name` in lower case (through
+  `rate_key_lower()`, see below), every run of
   whitespace collapsed to one space, then trimmed. The whitespace set is `\s`
   plus U+00A0, U+2007, U+202F and U+FEFF, and U+0085 is trimmed at the ends, the
   same characters as `entry_label_key` and the phone. The collision
@@ -31,7 +32,8 @@ but that grouping can now hold several entries, disambiguated by
   Rebuilt by migration 57, so it is the last column, after `entry_label_key`
 
 - `entry_label_key` - Generated and stored: `entry_label` built like
-  `item_name_key` (lower case, runs of whitespace collapsed to one space,
+  `item_name_key` (lower case through `rate_key_lower()`, runs of whitespace
+  collapsed to one space,
   trimmed), and `NULL` when nothing is left. The whitespace set is `\s` plus
   U+00A0, U+2007, U+202F and U+FEFF, and U+0085 is trimmed at the ends, the same
   characters the phone treats as space. So a label of only spaces counts as
@@ -41,6 +43,13 @@ but that grouping can now hold several entries, disambiguated by
   after `last_used_at`
 
 ### Rate Fields
+- `rate_key_lower(text)` - Function used by both key columns. It is Postgres
+  `lower()`, except that 409 capital letters keep their case (Cherokee, Osage,
+  Adlam, Georgian Mtavruli and some Latin letters). The phone's Dart
+  `toLowerCase()` leaves those letters alone, so the database and the phone make
+  the same key for every letter (owner decision, 1 November 2026). It is
+  `IMMUTABLE`, which the generated columns need. If a later Dart release
+  lower-cases more letters, the list in the function must grow.
 - `rate_amount` - `numeric(18,4)`, mirrors `cost_items.unit_price`
 - `rate_currency` - `character varying(20)`, mirrors `cost_items.currency`
 - `unit` - `character varying(50)`, nullable. Free text, not a Postgres enum
