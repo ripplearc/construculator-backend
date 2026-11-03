@@ -172,7 +172,7 @@ streams:
   # user_calculator_stores_select_policy is `user_id = jwt_internal_user_id()`
   # (schemas/calculator/user_calculator_stores/03_rls.sql), the same claim
   # auth.parameter reads here. PowerSync bypasses RLS, so this WHERE clause
-  # is what keeps one user's rates and sheet sizes off another user's phone.
+  # is what keeps one user's sheet sizes and densities off another user's phone.
   #
   # Only user-added or changed rows live in the table; the seeds ship in the
   # app and are laid over at read time. deleted_at is synced so every phone

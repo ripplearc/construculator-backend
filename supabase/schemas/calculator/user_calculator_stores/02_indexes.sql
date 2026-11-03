@@ -8,9 +8,11 @@ CREATE INDEX IF NOT EXISTS "user_calculator_stores_user_kind_idx"
   WHERE "deleted_at" IS NULL;
 
 -- One live row per changed seed. Two phones that edit the same default while
--- offline would otherwise each insert a row, and the two never merge. Keyed
--- on unit_system too because sheet sizes are seeded per system. Rows the
--- user adds themselves carry no "seed" key and stay unrestricted.
+-- offline would otherwise each insert a row, and the two never merge. The seed
+-- alone names the default: sheet seeds carry their system in the name
+-- (sheet_48x96in, sheet_1200x2400mm), and the other stores have one set of
+-- defaults for both systems, so unit_system is not part of the key (59). Rows
+-- the user adds themselves carry no "seed" key and stay unrestricted.
 CREATE UNIQUE INDEX IF NOT EXISTS "user_calculator_stores_live_seed_key"
-  ON "public"."user_calculator_stores" ("user_id", "store_kind", "unit_system", ("values"->>'seed'))
+  ON "public"."user_calculator_stores" ("user_id", "store_kind", ("values"->>'seed'))
   WHERE "deleted_at" IS NULL AND "values" ? 'seed';
