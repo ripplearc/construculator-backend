@@ -3,6 +3,7 @@
 
 CREATE OR REPLACE FUNCTION "public"."rate_key_lower"("value" "text") RETURNS "text"
     LANGUAGE "plpgsql" IMMUTABLE STRICT PARALLEL SAFE
+    SET "search_path" TO ''
     AS $$
 DECLARE
     -- The 410 capital letters that Postgres lower-cases and the phone's Dart
@@ -54,7 +55,7 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     -- U+202F and U+FEFF, which Postgres \s does not match) collapsed to one
     -- space, outer spaces and U+0085 trimmed, NULL when nothing is left. entry_label keeps the
     -- user's own spelling for display. Never written by a client. Added by
-    -- migration 57.
+    -- migration 60.
     "entry_label_key" "text" GENERATED ALWAYS AS (NULLIF(public.rate_key_lower(btrim(regexp_replace("entry_label", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085')), '')) STORED,
     -- The name as the contractor's other saves are matched against it, with the
     -- same characters as entry_label_key: lower case, runs of whitespace
@@ -62,7 +63,7 @@ CREATE TABLE IF NOT EXISTS "public"."your_rates" (
     -- without regard to capital letters or extra spaces", storyboard CUJ 6).
     -- item_name keeps the user's own spelling for display. A stored generated
     -- column, not an expression index, so the unique constraint below can still
-    -- be an upsert target. Rebuilt by migration 57 with the same characters as
+    -- be an upsert target. Rebuilt by migration 60 with the same characters as
     -- the phone, so it is the last column.
     "item_name_key" "text" GENERATED ALWAYS AS (public.rate_key_lower(btrim(regexp_replace("item_name", '[\s\u00a0\u2007\u202f\ufeff]+', ' ', 'g'), U&' \0085'))) STORED NOT NULL
 );

@@ -17,15 +17,15 @@
 -- U+0085 at the ends. Postgres \s does not, so those are listed here. Apple
 -- phones put U+202F in times such as "5 PM".
 --
--- Capital letters: Postgres lower() lower-cases 409 letters that Dart's
+-- Capital letters: Postgres lower() lower-cases 410 letters that Dart's
 -- toLowerCase() leaves alone, because they were added in newer Unicode versions
 -- (Cherokee, Osage, Adlam, Georgian Mtavruli, some Latin letters). The owner
 -- decided on 1 November 2026 that the database and the phone use one rule for
 -- every letter. rate_key_lower() below is that rule: lower(), except that those
--- 409 letters keep their case, as on the phone. It is IMMUTABLE so the two
+-- 410 letters keep their case, as on the phone. It is IMMUTABLE so the two
 -- generated columns can use it. If a later Dart release lower-cases more
--- letters, the list must grow: the test in your_rates_label_key_test.sql names
--- two of the letters, and the app has a matching test.
+-- letters, the list must grow. The test in your_rates_label_key_test.sql names
+-- two of the letters. The app has no test for them yet.
 --
 -- item_name_key gets the same expression. Migration 45 listed only U+00A0, so
 -- "Scissor lift" typed with a narrow no-break space was one name on the phone
@@ -53,7 +53,7 @@
 -- A label of only spaces clashes with a row that has no label. Run this
 -- before the deploy. It uses lower() because rate_key_lower() does not exist
 -- before this migration, so it can miss two rows that differ only by one of
--- the 409 letters above. It lists every other clashing group and every blank
+-- the 410 letters above. It lists every other clashing group and every blank
 -- name at once. Merge, relabel or delete those rows, then deploy:
 --   SELECT company_id, category,
 --          lower(btrim(regexp_replace(item_name,
@@ -87,6 +87,7 @@
 
 CREATE OR REPLACE FUNCTION "public"."rate_key_lower"("value" "text") RETURNS "text"
     LANGUAGE "plpgsql" IMMUTABLE STRICT PARALLEL SAFE
+    SET "search_path" TO ''
     AS $$
 DECLARE
     -- The 410 capital letters that Postgres lower-cases and the phone's Dart

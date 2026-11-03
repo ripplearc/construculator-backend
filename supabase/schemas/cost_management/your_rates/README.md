@@ -29,7 +29,7 @@ but that grouping can now hold several entries, disambiguated by
   constraint compares this column, so `Mini excavator`, `MINI  EXCAVATOR` and
   ` mini excavator ` are one name ("Names match without regard to capital
   letters or extra spaces", storyboard CUJ 6). Never written by a client.
-  Rebuilt by migration 57, so it is the last column, after `entry_label_key`
+  Rebuilt by migration 60, so it is the last column, after `entry_label_key`
 
 - `entry_label_key` - Generated and stored: `entry_label` built like
   `item_name_key` (lower case through `rate_key_lower()`, runs of whitespace
@@ -39,12 +39,12 @@ but that grouping can now hold several entries, disambiguated by
   characters the phone treats as space. So a label of only spaces counts as
   no label. The collision constraint compares this column. Never written by a
   client, and not in the `user_rates` stream: the phone builds its own key.
-  Added by migration 57 (`20261019120000_57_your_rates_label_key.sql`), so it is
+  Added by migration 60 (`20261104100000_60_your_rates_label_key.sql`), so it is
   after `last_used_at`
 
 ### Rate Fields
 - `rate_key_lower(text)` - Function used by both key columns. It is Postgres
-  `lower()`, except that 409 capital letters keep their case (Cherokee, Osage,
+  `lower()`, except that 410 capital letters keep their case (Cherokee, Osage,
   Adlam, Georgian Mtavruli and some Latin letters). The phone's Dart
   `toLowerCase()` leaves those letters alone, so the database and the phone make
   the same key for every letter (owner decision, 1 November 2026). It is
