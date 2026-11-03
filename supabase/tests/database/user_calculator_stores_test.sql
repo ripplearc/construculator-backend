@@ -158,10 +158,12 @@ SELECT throws_ok(
   'A second live row for the same seed, store and unit system is refused'
 );
 
-SELECT lives_ok(
+SELECT throws_ok(
   $$INSERT INTO public.user_calculator_stores (user_id, store_kind, "values", unit_system)
     VALUES ('11111111-1111-1111-1111-111111111111', 'waste', '{"seed": "ft2", "percent": 7}', 'metric')$$,
-  'The same seed under the other unit system is a different row'
+  '23505',
+  NULL,
+  'The same seed under the other unit system is refused too: the seed alone names the default'
 );
 
 SELECT lives_ok(

@@ -76,10 +76,13 @@ reach the server stands. An `INSERT` keeps the phone's `created_at` and
 ### One live row per changed seed
 
 `user_calculator_stores_live_seed_key` allows one live row per
-`(user_id, store_kind, unit_system, values->>'seed')`. Two phones that edit
-the same default while offline would otherwise each insert a row that never
-merges. Rows the user adds themselves have no `"seed"` key and are not
-restricted; a soft-deleted row frees its key.
+`(user_id, store_kind, values->>'seed')`. Two phones that edit the same
+default while offline would otherwise each insert a row that never merges.
+The seed alone names the default, whatever unit the user typed: sheet seeds
+carry their system in the name (`sheet_48x96in`, `sheet_1200x2400mm`), and
+the other stores have one set of defaults for both systems, so `unit_system`
+is not part of the key (migration 59). Rows the user adds themselves have no
+`"seed"` key and are not restricted; a soft-deleted row frees its key.
 
 ### Soft delete
 
@@ -97,8 +100,8 @@ follow-up if policy requires it (design doc, Security Considerations).
   deleted_at IS NULL` — the one read the app makes, a user's live rows of
   one store
 - `user_calculator_stores_live_seed_key`, unique, on `(user_id, store_kind,
-  unit_system, (values->>'seed')) WHERE deleted_at IS NULL AND values ?
-  'seed'` — one live row per changed seed
+  (values->>'seed')) WHERE deleted_at IS NULL AND values ? 'seed'` — one
+  live row per changed seed
 
 ## RLS
 
