@@ -37,6 +37,13 @@ CREATE POLICY "your_rates_update_policy" ON "public"."your_rates"
     WITH CHECK ("public"."jwt_user_is_company_member"("company_id"));
 
 
--- No DELETE policy, deliberately: neither Decision 55 nor the ticket
--- mentions deleting a saved rate. Matches user_consents' own
--- withheld-capability precedent (schemas/consent/user_consents/03_rls.sql).
+-- DELETE Policy
+-- A company member can delete their company's saved rates (Settled Decision 8,
+-- 2026-10-28). The app needs it to undo a save that finished after the 2 second
+-- limit: without the policy the server deleted 0 rows with no error and the
+-- row came back on the next sync.
+
+CREATE POLICY "your_rates_delete_policy" ON "public"."your_rates"
+    FOR DELETE
+    TO "authenticated"
+    USING ("public"."jwt_user_is_company_member"("company_id"));
