@@ -22,8 +22,42 @@ $$;
 ALTER FUNCTION "public"."rate_key_lower"("text") OWNER TO "postgres";
 
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
+
+
+-- The id every phone and this table give a saved rate (CA-1306): a version 5
+-- UUID of company, category, item_name_key, equipment_method and
+-- entry_label_key, so two phones that save the same rate offline end with one
+-- row and one id, and a second price under another label gets its own id.
+-- item_name_key and entry_label_key are passed in already built, so this
+-- function does not repeat the name rule. The phone computes the same id; both
+-- sides run the examples in
+-- your_rate_id_test.sql and test/libraries/powersync/units/models/your_rate_id_examples.json.
+CREATE OR REPLACE FUNCTION "public"."your_rate_id"(
+    "company_id" "uuid",
+    "category" "public"."cost_item_type_enum",
+    "item_name_key" "text",
+    "equipment_method" "public"."equipment_pricing_method_enum",
+    "entry_label_key" "text"
+) RETURNS "uuid"
+    LANGUAGE "sql" IMMUTABLE PARALLEL SAFE
+    SET "search_path" TO ''
+    AS $$
+    SELECT extensions.uuid_generate_v5(
+        '8cd2f594-2bb2-4396-ac37-762c9e552c65'::"uuid",
+        "company_id"::"text" || '|' || "category"::"text" || '|' || "item_name_key" || '|' || COALESCE("equipment_method"::"text", '') || '|' || COALESCE("entry_label_key", '')
+    )
+$$;
+
+
+ALTER FUNCTION "public"."your_rate_id"("uuid", "public"."cost_item_type_enum", "text", "public"."equipment_pricing_method_enum", "text") OWNER TO "postgres";
+
+
+REVOKE EXECUTE ON FUNCTION "public"."your_rate_id"("uuid", "public"."cost_item_type_enum", "text", "public"."equipment_pricing_method_enum", "text") FROM PUBLIC, "anon";
+
+
 CREATE TABLE IF NOT EXISTS "public"."your_rates" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "id" "uuid" NOT NULL,
     "company_id" "uuid" NOT NULL,
     "category" "public"."cost_item_type_enum" NOT NULL,
     "item_name" character varying(255) NOT NULL,
@@ -104,6 +138,7 @@ ALTER TABLE ONLY "public"."your_rates"
 
 -- Row rules, so another client cannot save rows the app never would.
 ALTER TABLE ONLY "public"."your_rates"
+    ADD CONSTRAINT "your_rates_id_matches_identity" CHECK ("id" = public."your_rate_id"("company_id", "category", "item_name_key", "equipment_method", "entry_label_key")),
     ADD CONSTRAINT "your_rates_item_name_not_blank" CHECK (length("item_name_key") > 0),
     ADD CONSTRAINT "your_rates_rate_amount_not_negative" CHECK ("rate_amount" >= 0),
     ADD CONSTRAINT "your_rates_rate_currency_not_blank" CHECK (length(btrim("rate_currency")) > 0),

@@ -1,5 +1,12 @@
 BEGIN;
 
+-- CA-1306: a your_rates id must now be the one your_rate_id() works out. These
+-- tests are about the label unique constraint, so the id check is dropped and
+-- the random default id is put back inside this transaction (rolled back with
+-- it), and rows get a random id.
+ALTER TABLE public.your_rates DROP CONSTRAINT your_rates_id_matches_identity;
+ALTER TABLE public.your_rates ALTER COLUMN id SET DEFAULT gen_random_uuid();
+
 -- Tests for CA-1261: your_rates.entry_label_key, the label the way other saves
 -- are matched against it. Two labels that differ only by capital letters or
 -- extra spaces have one key, so the collision constraint treats them as one
