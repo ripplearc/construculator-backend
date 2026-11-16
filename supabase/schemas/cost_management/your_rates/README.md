@@ -75,7 +75,8 @@ but that grouping can now hold several entries, disambiguated by
   so the app can say "Saved 3 days ago" for a rate that was never added and
   "Used 3 days ago" for one that was. Saving a new price moves `saved_at` and
   leaves this column alone. No CHECK against `saved_at`, because a save after
-  the last use is a valid state (CA-1265)
+  the last use is a valid state (CA-1265). An update keeps the later of the
+  stored and the incoming time (CA-1345, see Business Rules)
 - `created_at` / `updated_at` - Standard row-modification timestamps,
   present on every table in this repo regardless of whether the Dart entity
   exposes them; `updated_at` is kept current by the shared
@@ -119,8 +120,40 @@ count as equal for this constraint instead. The same constraint also serves
 as the grouping lookup index and, being a real column-list constraint rather
 than an expression index, is a valid
 `upsert(onConflict: 'company_id,category,item_name_key,equipment_method,entry_label_key')` target for
-the "exact same label" update-in-place case — the app does not use upsert
-today, but this keeps the option open without a schema change.
+the "exact same label" update-in-place case. The phone's upload upserts on
+`id`, not on this key, but the key stays a valid target without a schema change.
+
+### Last use keeps the later time (CA-1345)
+
+The phone stamps `last_used_at` itself, and its upload can wait in the queue
+for days, so two phones can upload uses of the same rate out of order. The
+storyboard (CUJ 6, "Used label") counts from the last time the rate was added
+to any estimate, so the later time must win. This is the one deliberate
+exception to the storyboard's general rule for two phones changing the same
+saved rate ("the change the server receives last wins"), which still holds for
+every other column.
+
+`trigger_keep_later_your_rates_last_used_at` (`BEFORE UPDATE`, function
+`keep_later_your_rates_last_used_at()`) sets
+`NEW.last_used_at := GREATEST(OLD.last_used_at, NEW.last_used_at)`. `GREATEST`
+ignores `NULL`, so:
+
+- a first use (stored value empty) sets the value
+- a later time replaces the stored one
+- an earlier time leaves the stored one unchanged
+- an empty time never erases a stored one, so a full-row upload from a phone
+  that has not seen the use cannot clear it
+
+Every other column in the same update is still applied. Every way the phone
+changes an existing row reaches the trigger: a `patch` is an update, a `put` is
+an upsert on `id` that takes the update path when the row exists, and the
+connector's fallback for a duplicate name sends a full-row update to the row
+that already holds it. The rule applies to every role, so a manual correction
+that moves the value back has to disable the trigger first. The times are the
+phones' own clocks. A phone with a clock set far ahead stamps a time that no
+later real use can replace, so that rate keeps showing as just used until
+someone disables the trigger and corrects the row. The `user_rates` stream
+sends the stored time, so every phone is shown the later one.
 
 ### Design-doc note: no override / default-price columns
 
@@ -213,4 +246,9 @@ table/PK/FK/index shape, the unique constraint's collision behavior
 (including the both-`NULL`-label case, a Day row next to a Job row, and names
 that differ only by case or spaces), the CHECK rules, RLS SELECT/INSERT/UPDATE scoping
 across two companies, the no-claim denial-by-default case, and the
-`updated_at` trigger.
+`updated_at` trigger. `your_rates_last_used_at_test.sql` covers the
+`last_used_at` column (CA-1265), and `your_rates_keep_later_last_used_at_test.sql`
+covers the keep-later trigger (CA-1345): earlier, later and first use, the
+exact boundary down to one microsecond, an empty time, other columns in the same
+update, two rows in one statement, the upsert on `id` and on the unique key, and
+a role other than `authenticated`.
