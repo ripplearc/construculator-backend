@@ -20,13 +20,16 @@
 -- authenticated: a manual correction that moves the value back has to disable
 -- the trigger first.
 --
--- It fires on UPDATE only. An insert has no old value, and an upsert that
--- lands on an existing row takes the update path, so it is covered too.
+-- The incoming time is also checked, on insert and on update, because the
+-- phones' clocks are not trusted. A time more than 1 day after the server's
+-- now() is stored as now() instead, so a phone with a clock set far ahead
+-- cannot make a rate show as just used until that date has passed. An
+-- infinite time ('infinity' or '-infinity') is refused with an error. The app
+-- cannot send one, so only a direct API call can.
 --
--- Times are the phones' own clocks. A phone with a clock set far ahead stamps a
--- time that no later real use can replace, so that rate keeps showing as just
--- used until someone disables the trigger and corrects the row. This rule does
--- not try to prevent that.
+-- On update the stored time is then compared as above. An upsert that lands
+-- on an existing row takes the update path, so it is covered too. An insert
+-- has no old value, so it only gets the checks on the incoming time.
 --
 -- This is the one exception to the storyboard's general rule for two phones
 -- changing the same saved rate ("the change the server receives last wins"),
@@ -49,15 +52,23 @@ CREATE OR REPLACE FUNCTION "public"."keep_later_your_rates_last_used_at"()
     SET "search_path" TO 'public'
     AS $$
 BEGIN
-  NEW.last_used_at := GREATEST(OLD.last_used_at, NEW.last_used_at);
+  IF NEW.last_used_at IN ('infinity', '-infinity') THEN
+    RAISE EXCEPTION 'last_used_at must be a finite time' USING ERRCODE = '22023';
+  END IF;
+  IF NEW.last_used_at > now() + interval '1 day' THEN
+    NEW.last_used_at := now();
+  END IF;
+  IF TG_OP = 'UPDATE' THEN
+    NEW.last_used_at := GREATEST(OLD.last_used_at, NEW.last_used_at);
+  END IF;
   RETURN NEW;
 END;
 $$;
 
 ALTER FUNCTION "public"."keep_later_your_rates_last_used_at"() OWNER TO "postgres";
-COMMENT ON FUNCTION "public"."keep_later_your_rates_last_used_at"() IS 'Trigger function for your_rates. Keeps the later of the stored and the incoming last_used_at, so an upload of an older use from an offline phone cannot move the value back. NULL never replaces a stored time.';
+COMMENT ON FUNCTION "public"."keep_later_your_rates_last_used_at"() IS 'Trigger function for your_rates. On insert and update, stores now() for a last_used_at more than 1 day ahead and refuses an infinite time. On update, keeps the later of the stored and the incoming last_used_at, so an upload of an older use from an offline phone cannot move the value back. NULL never replaces a stored time.';
 
 CREATE OR REPLACE TRIGGER "trigger_keep_later_your_rates_last_used_at"
-    BEFORE UPDATE ON "public"."your_rates"
+    BEFORE INSERT OR UPDATE ON "public"."your_rates"
     FOR EACH ROW
     EXECUTE FUNCTION "public"."keep_later_your_rates_last_used_at"();

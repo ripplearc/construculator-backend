@@ -133,8 +133,9 @@ exception to the storyboard's general rule for two phones changing the same
 saved rate ("the change the server receives last wins"), which still holds for
 every other column.
 
-`trigger_keep_later_your_rates_last_used_at` (`BEFORE UPDATE`, function
-`keep_later_your_rates_last_used_at()`) sets
+`trigger_keep_later_your_rates_last_used_at` (`BEFORE INSERT OR UPDATE`,
+function `keep_later_your_rates_last_used_at()`) first checks the incoming time
+(see below). On update it then sets
 `NEW.last_used_at := GREATEST(OLD.last_used_at, NEW.last_used_at)`. `GREATEST`
 ignores `NULL`, so:
 
@@ -149,11 +150,18 @@ changes an existing row reaches the trigger: a `patch` is an update, a `put` is
 an upsert on `id` that takes the update path when the row exists, and the
 connector's fallback for a duplicate name sends a full-row update to the row
 that already holds it. The rule applies to every role, so a manual correction
-that moves the value back has to disable the trigger first. The times are the
-phones' own clocks. A phone with a clock set far ahead stamps a time that no
-later real use can replace, so that rate keeps showing as just used until
-someone disables the trigger and corrects the row. The `user_rates` stream
-sends the stored time, so every phone is shown the later one.
+that moves the value back has to disable the trigger first. The `user_rates`
+stream sends the stored time, so every phone is shown the later one.
+
+The times are the phones' own clocks, so the incoming time is checked on insert
+and on update, before the comparison:
+
+- a time more than 1 day after the server's `now()` is stored as `now()`, so a
+  phone with a clock set far ahead cannot make a rate show as just used until
+  that date has passed
+- `infinity` and `-infinity` are refused with an error (`22023`). The app cannot
+  send one, so only a direct API call can
+- a time up to 1 day ahead, and any past time, is kept as sent
 
 ### Design-doc note: no override / default-price columns
 
@@ -250,5 +258,6 @@ across two companies, the no-claim denial-by-default case, and the
 `last_used_at` column (CA-1265), and `your_rates_keep_later_last_used_at_test.sql`
 covers the keep-later trigger (CA-1345): earlier, later and first use, the
 exact boundary down to one microsecond, an empty time, other columns in the same
-update, two rows in one statement, the upsert on `id` and on the unique key, and
-a role other than `authenticated`.
+update, two rows in one statement, the upsert on `id` and on the unique key, a
+time more than 1 day ahead on insert and on update, `infinity` and `-infinity`,
+and a role other than `authenticated`.

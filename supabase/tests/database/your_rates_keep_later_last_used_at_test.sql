@@ -5,10 +5,11 @@ BEGIN;
 -- time, a later time, the first use, the exact boundary, other columns sent in
 -- the same update, an empty time, an update that leaves the column out, two
 -- rows in one statement, the upsert the phone sends (on id and on the unique
--- key), an empty time on both sides, a one microsecond difference, and a role
+-- key), an empty time on both sides, a one microsecond difference, a time more
+-- than 1 day ahead of the server on insert and on update, infinity, and a role
 -- other than authenticated.
 
-SELECT plan(26);
+SELECT plan(32);
 
 -- ============================================================
 -- Shape
@@ -297,6 +298,60 @@ SELECT is(
   (SELECT last_used_at FROM public.your_rates WHERE item_name = 'Fresh insert'),
   '2026-03-02T09:00:00Z'::timestamptz,
   'An insert keeps the time it was sent with'
+);
+
+-- ============================================================
+-- A time far ahead of the server clock, and infinity
+-- ============================================================
+
+INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at, last_used_at)
+VALUES ('c1345000-0000-0000-0000-000000000005', 'equipment', 'Future update', 100.0000, 'USD', '2026-03-01T00:00:00Z', '2026-03-02T09:00:00Z');
+
+UPDATE public.your_rates SET last_used_at = now() + interval '2 days' WHERE item_name = 'Future update';
+
+SELECT is(
+  (SELECT last_used_at FROM public.your_rates WHERE item_name = 'Future update'),
+  now(),
+  'An update with a time more than 1 day ahead stores the server time'
+);
+
+INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at, last_used_at)
+VALUES ('c1345000-0000-0000-0000-000000000005', 'equipment', 'Future insert', 100.0000, 'USD', '2026-03-01T00:00:00Z', now() + interval '2 days');
+
+SELECT is(
+  (SELECT last_used_at FROM public.your_rates WHERE item_name = 'Future insert'),
+  now(),
+  'An insert with a time more than 1 day ahead stores the server time'
+);
+
+UPDATE public.your_rates SET last_used_at = now() + interval '12 hours' WHERE item_name = 'Future update';
+
+SELECT is(
+  (SELECT last_used_at FROM public.your_rates WHERE item_name = 'Future update'),
+  now() + interval '12 hours',
+  'A time less than 1 day ahead is kept as sent'
+);
+
+SELECT throws_ok(
+  $$UPDATE public.your_rates SET last_used_at = 'infinity' WHERE item_name = 'Future update'$$,
+  '22023',
+  'last_used_at must be a finite time',
+  'An update with infinity is refused'
+);
+
+SELECT throws_ok(
+  $$UPDATE public.your_rates SET last_used_at = '-infinity' WHERE item_name = 'Future update'$$,
+  '22023',
+  'last_used_at must be a finite time',
+  'An update with -infinity is refused'
+);
+
+SELECT throws_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at, last_used_at)
+    VALUES ('c1345000-0000-0000-0000-000000000005', 'equipment', 'Infinity insert', 100.0000, 'USD', '2026-03-01T00:00:00Z', 'infinity')$$,
+  '22023',
+  'last_used_at must be a finite time',
+  'An insert with infinity is refused'
 );
 
 -- ============================================================
