@@ -10,7 +10,7 @@ BEGIN;
 -- shared updated_at trigger, the EXECUTE rights on the membership helper, an
 -- ON CONFLICT upsert with a NULL label, and one user in two companies.
 
-SELECT plan(55);
+SELECT plan(57);
 
 -- ============================================================
 -- Shape
@@ -444,8 +444,9 @@ SELECT throws_ok(
 
 -- CA-1207: delete. The member saves a probe row, sees it, deletes it and no
 -- longer sees it. A delete aimed at Company B's rows runs without an error and
--- removes nothing (USING hides them): the postgres count below proves Company
--- B's row is still there.
+-- removes nothing, because the SELECT policy hides them before the DELETE
+-- policy is checked. That means this delete cannot tell a broken DELETE policy
+-- from the real one, so the pg_policies test below checks the policy itself.
 SELECT lives_ok(
   $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
     VALUES ('77777777-7777-7777-7777-777777777777', 'labor', 'Delete probe', 10.0000, 'USD', now())$$,
@@ -485,6 +486,20 @@ SELECT is(
   (SELECT count(*) FROM public.your_rates WHERE company_id = '88888888-8888-8888-8888-888888888888'),
   1::bigint,
   'Company B''s row count is unchanged by every write attempt above'
+);
+
+SELECT is(
+  (SELECT roles::text FROM pg_policies
+     WHERE tablename = 'your_rates' AND policyname = 'your_rates_delete_policy'),
+  '{authenticated}',
+  'The DELETE policy applies to the authenticated role only'
+);
+
+SELECT is(
+  (SELECT qual FROM pg_policies
+     WHERE tablename = 'your_rates' AND policyname = 'your_rates_delete_policy'),
+  'jwt_user_is_company_member(company_id)',
+  'The DELETE policy limits a delete to the caller''s own companies'
 );
 
 SET LOCAL ROLE authenticated;
