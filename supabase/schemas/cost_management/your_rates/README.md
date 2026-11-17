@@ -164,10 +164,11 @@ role. The ticket does not gate "Your rates" access by role.
   `USING` and `WITH CHECK` both apply `jwt_user_is_company_member`, so a
   member cannot retarget a row to a company they don't belong to (mirrors
   `cost_estimates_update_policy`'s two-clause pattern)
-- No **DELETE** policy, deliberately — neither Decision 55 nor the ticket
-  mentions deleting a saved rate. Mirrors `user_consents`' own
-  withheld-capability precedent: with no policy, DELETE succeeds having
-  changed zero rows rather than erroring.
+- **DELETE** - a company member can delete their company's saved rates
+  (Settled Decision 8, 2026-10-28). `USING` applies
+  `jwt_user_is_company_member`, so a member deleting a row of another company
+  deletes zero rows and gets no error. The app needs it to undo a save that
+  finished after its 2 second limit.
 
 **RLS alone does not scope a read to one company.** `company_users` has a
 unique index on `(user_id, company_id)` (migration 10), so one user can

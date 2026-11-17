@@ -10,7 +10,7 @@ BEGIN;
 -- shared updated_at trigger, the EXECUTE rights on the membership helper, an
 -- ON CONFLICT upsert with a NULL label, and one user in two companies.
 
-SELECT plan(50);
+SELECT plan(57);
 
 -- ============================================================
 -- Shape
@@ -46,12 +46,12 @@ SELECT is(
   'equipment_pricing_method_enum carries exactly the Flutter EquipmentPricingMethod.name wire values, in order'
 );
 
--- No DELETE policy: append-only-by-omission, matching user_consents.
+-- CA-1207: a company member can delete a saved rate (Settled Decision 8).
 SELECT is(
   (SELECT count(*) FROM pg_policies
      WHERE schemaname = 'public' AND tablename = 'your_rates' AND cmd = 'DELETE'),
-  0::bigint,
-  'your_rates has NO DELETE policy (deleting a saved rate is out of scope for CA-1145)'
+  1::bigint,
+  'your_rates has one DELETE policy (CA-1207)'
 );
 
 -- ============================================================
@@ -442,6 +442,40 @@ SELECT throws_ok(
   'A company member cannot retarget their own row to a company they do not belong to (WITH CHECK)'
 );
 
+-- CA-1207: delete. The member saves a probe row, sees it, deletes it and no
+-- longer sees it. A delete aimed at Company B's rows runs without an error and
+-- removes nothing, because the SELECT policy hides them before the DELETE
+-- policy is checked. That means this delete cannot tell a broken DELETE policy
+-- from the real one, so the pg_policies test below checks the policy itself.
+SELECT lives_ok(
+  $$INSERT INTO public.your_rates (company_id, category, item_name, rate_amount, rate_currency, saved_at)
+    VALUES ('77777777-7777-7777-7777-777777777777', 'labor', 'Delete probe', 10.0000, 'USD', now())$$,
+  'A company member can save the row that the delete tests below remove'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.your_rates WHERE item_name = 'Delete probe'),
+  1::bigint,
+  'The probe row is visible to the member who saved it'
+);
+
+SELECT lives_ok(
+  $$DELETE FROM public.your_rates
+    WHERE company_id = '77777777-7777-7777-7777-777777777777' AND item_name = 'Delete probe'$$,
+  'A company member can delete a saved rate of their own company'
+);
+
+SELECT is(
+  (SELECT count(*) FROM public.your_rates WHERE item_name = 'Delete probe'),
+  0::bigint,
+  'The deleted probe row is gone'
+);
+
+SELECT lives_ok(
+  $$DELETE FROM public.your_rates WHERE company_id = '88888888-8888-8888-8888-888888888888'$$,
+  'A company member deleting rows of another company gets no error and removes nothing'
+);
+
 -- Checked as postgres (RLS bypassed): Company A's member has no SELECT
 -- visibility into Company B's rows at all, so re-running this count under
 -- their own session would read 0 whether or not the retarget above had
@@ -452,6 +486,20 @@ SELECT is(
   (SELECT count(*) FROM public.your_rates WHERE company_id = '88888888-8888-8888-8888-888888888888'),
   1::bigint,
   'Company B''s row count is unchanged by every write attempt above'
+);
+
+SELECT is(
+  (SELECT roles::text FROM pg_policies
+     WHERE tablename = 'your_rates' AND policyname = 'your_rates_delete_policy'),
+  '{authenticated}',
+  'The DELETE policy applies to the authenticated role only'
+);
+
+SELECT is(
+  (SELECT qual FROM pg_policies
+     WHERE tablename = 'your_rates' AND policyname = 'your_rates_delete_policy'),
+  'jwt_user_is_company_member(company_id)',
+  'The DELETE policy limits a delete to the caller''s own companies'
 );
 
 SET LOCAL ROLE authenticated;
