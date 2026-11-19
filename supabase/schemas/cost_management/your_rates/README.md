@@ -95,7 +95,9 @@ save one rate offline end with one row and the last upload wins (storyboard
 CUJ 6). The label key is part of the id, the same five columns as the unique
 constraint below, so a second price for one name and method under another label
 is a second row with its own id (owner decision on CA-1306 and CA-1336,
-2026-11-06). No label and a blank label give the same id. Migration 63 gives
+2026-11-06). No label and a blank label give the same id. A backslash or a `|` in the name
+key or the label key gets a backslash before it, so a name and a label can never
+run together into the id of another rate. Migration 63 gives
 every existing row its computed id before it adds the check. `anon` cannot run
 `your_rate_id`.
 

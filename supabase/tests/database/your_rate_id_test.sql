@@ -10,7 +10,7 @@ BEGIN;
 -- scripts/your_rate_id_examples_sql.py, which also checks them (--check).
 -- Run as postgres, which bypasses RLS and isolates the constraint layer.
 
-SELECT plan(44);
+SELECT plan(48);
 
 INSERT INTO companies (id, email, phone, name)
 VALUES
@@ -66,7 +66,7 @@ SELECT * FROM (VALUES
   ('equipment no method', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', NULL::equipment_pricing_method_enum, NULL, 'd9a0f9f6-4ee1-51e8-867f-98b0cfa1840c'::uuid),
   ('accented capital', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, U&'\00c9clair', NULL::equipment_pricing_method_enum, NULL, '237a3f84-f073-5b82-9bc3-60c217d23d15'::uuid),
   ('cherokee capital kept', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, U&'\13a0\13a1', NULL::equipment_pricing_method_enum, NULL, '54cc7838-8d14-503f-8627-33bb045fdeaf'::uuid),
-  ('pipe in name', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, 'a|day', NULL::equipment_pricing_method_enum, NULL, 'fcf0e76c-5666-5dc4-9946-d11f33118fe9'::uuid),
+  ('pipe in name', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, 'a|day', NULL::equipment_pricing_method_enum, NULL, 'c19f3528-bc11-5c4c-90a2-de6b8a617441'::uuid),
   ('ideographic space', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, U&'A\3000B', NULL::equipment_pricing_method_enum, NULL, 'de2c51b0-fbc6-518b-9921-a966628964df'::uuid),
   ('line separator', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, U&'A\2028B', NULL::equipment_pricing_method_enum, NULL, 'de2c51b0-fbc6-518b-9921-a966628964df'::uuid),
   ('greek final sigma', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, U&'\039f\0394\039f\03a3', NULL::equipment_pricing_method_enum, NULL, 'b38c7d8f-6677-5f74-857b-260951a53587'::uuid),
@@ -80,8 +80,12 @@ SELECT * FROM (VALUES
   ('label case and spaces', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', 'day'::equipment_pricing_method_enum, '  WITH   operator ', '7b0eae4d-2e0f-50ed-bba5-1bf730149ab7'::uuid),
   ('blank label is no label', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', 'day'::equipment_pricing_method_enum, '   ', '8d4e4cd4-c8a1-54ee-bdfc-650421a2e1e8'::uuid),
   ('other label', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', 'day'::equipment_pricing_method_enum, 'Supplier A', '0c33880a-23ca-5792-b2a8-0273b73de3ab'::uuid),
-  ('pipe in label', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', 'day'::equipment_pricing_method_enum, 'a|job', '9a2a64bb-09eb-51e2-a917-f6bf6be8b8fc'::uuid),
-  ('non-ascii label', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, 'Concrete', NULL::equipment_pricing_method_enum, U&'\00c9clair \0130stanbul', '3ae64bb3-0dac-59bb-9276-f715e2a40a1a'::uuid)
+  ('pipe in label', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', 'day'::equipment_pricing_method_enum, 'a|job', '02c8dea2-bee7-57ca-8211-7ef33562b424'::uuid),
+  ('non-ascii label', '77777777-7777-7777-7777-777777777777'::uuid, 'material'::cost_item_type_enum, 'Concrete', NULL::equipment_pricing_method_enum, U&'\00c9clair \0130stanbul', '3ae64bb3-0dac-59bb-9276-f715e2a40a1a'::uuid),
+  ('pipes in a label make a name look like another rate: first', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift', 'day'::equipment_pricing_method_enum, 'a|job|b', '5ad4cfc6-1908-591a-81eb-db91462e3359'::uuid),
+  ('pipes in a label make a name look like another rate: second', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'Scissor lift|day|a', 'job'::equipment_pricing_method_enum, 'b', '1bbef0ca-6536-5b37-9bcd-ed487d372332'::uuid),
+  ('backslash at the end of a name', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'a\', 'day'::equipment_pricing_method_enum, 'b', '32f95f45-3025-50b0-b3cf-5adb92b9a927'::uuid),
+  ('backslash at the start of a label', '77777777-7777-7777-7777-777777777777'::uuid, 'equipment'::cost_item_type_enum, 'a', 'day'::equipment_pricing_method_enum, '\b', 'ff1c51c2-7f11-53a5-8f7c-8ad7240e451e'::uuid)
 -- END GENERATED EXAMPLES
 ) AS v(example, company_id, category, item_name, equipment_method, entry_label, expected_id);
 
