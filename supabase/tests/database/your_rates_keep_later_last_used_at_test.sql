@@ -11,6 +11,13 @@ BEGIN;
 
 SELECT plan(32);
 
+-- CA-1306: a your_rates id must now be the one your_rate_id() works out. These
+-- tests are about last_used_at and insert rows with random ids, so the id check
+-- is dropped and the random default id is put back inside this transaction
+-- (rolled back with it). The id rule itself is tested in your_rate_id_test.sql.
+ALTER TABLE public.your_rates DROP CONSTRAINT your_rates_id_matches_identity;
+ALTER TABLE public.your_rates ALTER COLUMN id SET DEFAULT gen_random_uuid();
+
 -- ============================================================
 -- Shape
 -- ============================================================

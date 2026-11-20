@@ -1,5 +1,13 @@
 BEGIN;
 
+-- CA-1306: a your_rates id must now be the one your_rate_id() works out. These
+-- tests are about other rules and insert rows without an id, so the id check
+-- is dropped and the random default id is put back inside this transaction
+-- (rolled back with it). The id rule
+-- itself is tested in your_rate_id_test.sql.
+ALTER TABLE public.your_rates DROP CONSTRAINT your_rates_id_matches_identity;
+ALTER TABLE public.your_rates ALTER COLUMN id SET DEFAULT gen_random_uuid();
+
 -- Tests for CA-1145: your_rates, the contractor's personal saved-rate book.
 -- Covers table/PK/FK shape, the UNIQUE NULLS NOT DISTINCT constraint that
 -- enforces the (company_id, category, item_name_key, equipment_method,

@@ -86,9 +86,26 @@ but that grouping can now hold several entries, disambiguated by
 
 ### Collision / save semantics (Decision 55)
 
-A "collision" is on `(company_id, category, item_name_key, equipment_method)` plus the label — never on `id`,
-which is an ordinary server-generated primary key, not chosen by the caller
-and not part of collision detection.
+Since CA-1306 the `id` is not random. It is `your_rate_id(company_id, category,
+item_name_key, equipment_method, entry_label_key)`, a version 5 UUID, and the
+check `your_rates_id_matches_identity` refuses any row whose `id` differs. The
+column has no default, so an insert without an id fails with a not-null error.
+Every phone computes the same id (`YourRateId` in the app), so two phones that
+save one rate offline end with one row and the last upload wins (storyboard
+CUJ 6). The label key is part of the id, the same five columns as the unique
+constraint below, so a second price for one name and method under another label
+is a second row with its own id (owner decision on CA-1306 and CA-1336,
+2026-11-06). No label and a blank label give the same id. A backslash or a `|` in the name
+key or the label key gets a backslash before it, so a name and a label can never
+run together into the id of another rate. Migration 63 gives
+every existing row its computed id before it adds the check. `anon` cannot run
+`your_rate_id`.
+
+The examples both sides run are in the app's
+`test/libraries/powersync/units/models/your_rate_id_examples.json`, which is the
+one source. The list in `supabase/tests/database/your_rate_id_test.sql` is
+written from it by `scripts/your_rate_id_examples_sql.py --write <path>`, and
+`--check <path>` fails when the two differ.
 
 Day and Job are separate rows: one machine saved with a day rate and with a job
 price is two rows, each with its own price and unit ("Saved with both",

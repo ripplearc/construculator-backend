@@ -1,5 +1,13 @@
 BEGIN;
 
+-- CA-1306: a your_rates id must now be the one your_rate_id() works out. These
+-- tests are about other rules and insert rows without an id, so the id check
+-- is dropped and the random default id is put back inside this transaction
+-- (rolled back with it). The id rule
+-- itself is tested in your_rate_id_test.sql.
+ALTER TABLE public.your_rates DROP CONSTRAINT your_rates_id_matches_identity;
+ALTER TABLE public.your_rates ALTER COLUMN id SET DEFAULT gen_random_uuid();
+
 -- Tests for CA-1265: your_rates.last_used_at, the last time a cost line was
 -- added with a saved rate. Covers the column shape, that PowerSync replicates
 -- it, that NULL means "never added", that a company member can write it
