@@ -35,7 +35,7 @@ CREATE OR REPLACE FUNCTION "public"."your_rate_id"(
     AS $$
     SELECT extensions.uuid_generate_v5(
         '8cd2f594-2bb2-4396-ac37-762c9e552c65'::"uuid",
-        "company_id"::"text" || '|' || "category"::"text" || '|' || replace(replace("item_name_key", '\', '\\'), '|', '\|') || '|' || COALESCE("equipment_method"::"text", '') || '|' || replace(replace(COALESCE("entry_label_key", ''), '\', '\\'), '|', '\|')
+        "company_id"::"text" || '|' || "category"::"text" || '|' || replace(replace("item_name_key", E'\\', E'\\\\'), '|', E'\\|') || '|' || COALESCE("equipment_method"::"text", '') || '|' || replace(replace(COALESCE("entry_label_key", ''), E'\\', E'\\\\'), '|', E'\\|')
     )
 $$;
 
